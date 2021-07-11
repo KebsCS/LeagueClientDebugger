@@ -1,0 +1,8 @@
+x64/
+Debug/
+Release/
+LoLXMPPDebugger/x64/
+LoLXMPPDebugger/Debug/
+LoLXMPPDebugger/Release/
+LoLXMPPDebugger/incoming.txt
+LoLXMPPDebugger/outgoing.txt
