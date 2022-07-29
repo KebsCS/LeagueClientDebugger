@@ -5,6 +5,13 @@
 #include <QFile>
 #include <QMessageBox>
 #include <QFileDialog>
+#include <QtCore>
+#include <QTcpSocket>
+#include <QTcpServer>
+#include <QNetworkProxy>
+#include <QProcess>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
 
 #include "ui_LoLXMPPDebugger.h"
 
@@ -18,6 +25,7 @@ public:
 
 private slots:
 	void on_pushButton_clicked();
+	void on_pushButton_LaunchLeague_clicked();
 
 	void on_outgoingScrollToBottom_toggled(bool);
 	void on_incomingScrollToBottom_toggled(bool);
@@ -31,13 +39,21 @@ private slots:
 	void on_actionIncoming_triggered();
 	void on_actionBoth_triggered();
 	void on_actionChoose_directory_triggered();
-
+	void onNewConnection();
+	void newConnection();
+	void onSocketStateChanged(QAbstractSocket::SocketState socketState);
+	void onReadyRead();
+	void onFinishRequest(QNetworkReply* response);
 private:
 	Ui::LoLXMPPDebuggerClass ui;
 
 	QDateTime startTime;
-
 	QString saveDir;
+	QTcpSocket* socket;
+	QTcpServer* server;
+	int port;
+
+	QList<QTcpSocket*>clients;
 
 	int counter = 0;
 };
