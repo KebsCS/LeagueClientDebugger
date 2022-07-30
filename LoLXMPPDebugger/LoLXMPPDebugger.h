@@ -12,6 +12,8 @@
 #include <QProcess>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
+#include <QJsonObject>
+#include <QJsonDocument>
 
 #include "ui_LoLXMPPDebugger.h"
 
@@ -40,7 +42,6 @@ private slots:
 	void on_actionBoth_triggered();
 	void on_actionChoose_directory_triggered();
 	void onNewConnection();
-	void newConnection();
 	void onSocketStateChanged(QAbstractSocket::SocketState socketState);
 	void onReadyRead();
 	void onFinishRequest(QNetworkReply* response);
@@ -51,9 +52,13 @@ private:
 	QString saveDir;
 	QTcpSocket* socket;
 	QTcpServer* server;
+	QTcpSocket* leagueSocket;
 	int port;
+	int chatPort;
 
 	QList<QTcpSocket*>clients;
 
+	QString clientConfigUrl = "https://clientconfig.rpg.riotgames.com";
+	QString geoPasUrl = "https://riot-geo.pas.si.riotgames.com/pas/v1/service/chat";
 	int counter = 0;
 };

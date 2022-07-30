@@ -15,10 +15,8 @@ LoLXMPPDebugger::LoLXMPPDebugger(QWidget* parent)
 	socket = new QTcpSocket(this);
 	socket->bind(QHostAddress::SpecialAddress::LocalHost, 0);
 	socket->connectToHost(QHostAddress::SpecialAddress::LocalHost, 0);
-	
+
 	port = socket->localPort();
-	qDebug() << "PORT " << socket->peerPort() << " - " << socket->localPort();
-	
 	// start a server on open port
 	server = new QTcpServer(this);
 	if (!server->listen(QHostAddress::Any, port))
@@ -27,32 +25,12 @@ LoLXMPPDebugger::LoLXMPPDebugger(QWidget* parent)
 	}
 	else
 	{
-		qDebug() << "Server started";
+		qDebug() << "Server started on port " << port;
 	}
 
 	connect(server, SIGNAL(newConnection()), this, SLOT(onNewConnection()));
 
-	//QNetworkProxy proxy;
-	//proxy.setType(QNetworkProxy::HttpProxy);
-	//proxy.setHostName(server->serverAddress().toString());
-	//proxy.setPort(server->serverPort());
-	////proxy.setUser("username");
-	////proxy.setPassword("password");
-	//QNetworkProxy::setApplicationProxy(proxy);
-
-	//server->close();
-
-
-	//NetworkProxy nt;
-	//nt.queryProxy(socket->proxy());
-
-	// 1. Set up a server on localhost
-	// proxy everything from https://clientconfig.rpg.riotgames.com
-
-
-
-	// connect and stuff
-	ui.statusBar->showMessage("Connected.", 10000);
+	ui.statusBar->showMessage("Proxy server started.", 10000);
 }
 
 void LoLXMPPDebugger::onNewConnection()
@@ -62,11 +40,7 @@ void LoLXMPPDebugger::onNewConnection()
 	connect(clientSocket, SIGNAL(stateChanged(QAbstractSocket::SocketState)), this, SLOT(onSocketStateChanged(QAbstractSocket::SocketState)));
 
 	clients.push_back(clientSocket);
-	for (QTcpSocket* socket : clients)
-	{		
-		qDebug() << clientSocket->peerAddress().toString() << " connected to server";
-	}
-
+	qDebug() << clientSocket->peerAddress().toString() << " connected to server";
 }
 
 void LoLXMPPDebugger::onSocketStateChanged(QAbstractSocket::SocketState socketState)
@@ -80,70 +54,109 @@ void LoLXMPPDebugger::onSocketStateChanged(QAbstractSocket::SocketState socketSt
 
 void LoLXMPPDebugger::onReadyRead()
 {
+	// proxied client request
 	QTcpSocket* sender = static_cast<QTcpSocket*>(QObject::sender());
 	QString response = sender->readAll();
-	for (QTcpSocket* socket : clients) {
-		if (socket != sender)
-		{
-			qDebug() << "Server received: " << response;
-			QStringList buf = QString(response).split(' ');
-			
-			QNetworkAccessManager* manager = new QNetworkAccessManager(this);
-			connect(manager, SIGNAL(finished(QNetworkReply*)), this, SLOT(onFinishRequest(QNetworkReply*)));
-			connect(manager, SIGNAL(finished(QNetworkReply*)), manager, SLOT(deleteLater()));
+	leagueSocket = sender;
+	qDebug() << "Server received: " << response;
+	QStringList buf = QString(response).split(' ');
 
-			QString url = "https://clientconfig.rpg.riotgames.com" + buf.at(1);
-			QNetworkRequest request(url);
-			request.setHeader(QNetworkRequest::KnownHeaders::ContentTypeHeader, "application/json");
-			request.setRawHeader(QByteArray("Host"), "clientconfig.rpg.riotgames.com");
-			
-			QRegularExpression userAgent("(?<=user-agent: )([a-zA-Z]+)");
-			QRegularExpressionMatch match = userAgent.match(response);
-			if (match.hasMatch())
-			{
-				request.setHeader(QNetworkRequest::KnownHeaders::UserAgentHeader, match.captured());
-			}
-			QRegularExpression acceptEncoding("(?<=Accept-Encoding: )([a-zA-Z]+)");
-			match = acceptEncoding.match(response);
-			if (match.hasMatch())
-			{
-				request.setRawHeader(QByteArray("Accept-Encoding"), match.captured().toUtf8());
-			}
-			QRegularExpression accept("(?<=Accept: )([a-z/A-Z]+)");
-			match = accept.match(response);
-			if (match.hasMatch())
-			{
-				request.setRawHeader(QByteArray("Accept"), match.captured().toUtf8());
-			}
 
-			manager->get(request);
+	// send proxied request to real server
+	QNetworkAccessManager* manager = new QNetworkAccessManager(this);
+	connect(manager, SIGNAL(finished(QNetworkReply*)), this, SLOT(onFinishRequest(QNetworkReply*)));
+	connect(manager, SIGNAL(finished(QNetworkReply*)), manager, SLOT(deleteLater()));
 
-		}
+	QString url = clientConfigUrl + buf.at(1);
+	QNetworkRequest request(url);
+	request.setHeader(QNetworkRequest::KnownHeaders::ContentTypeHeader, "application/json");
+
+	QRegularExpression userAgent(R"((?<=user-agent: )([a-z/A-Z0-9.\ \-\(\;\,\)]+))");
+	QRegularExpressionMatch match = userAgent.match(response);
+	if (match.hasMatch())
+	{
+		request.setHeader(QNetworkRequest::KnownHeaders::UserAgentHeader, match.captured());
 	}
+
+	QRegularExpression acceptEncoding(R"((?<=Accept-Encoding: )([a-z/A-Z0-9.\ \-\(\;\,\)]+))");
+	match = acceptEncoding.match(response);
+	if (match.hasMatch())
+	{
+		request.setRawHeader(QByteArray("Accept-Encoding"), match.captured().toUtf8());
+	}
+
+	QRegularExpression entitlements(R"((?<=X-Riot-Entitlements-JWT: )([a-z/A-Z0-9.\ \-\(\;\,\)\_]+))");
+	match = entitlements.match(response);
+	if (match.hasMatch())
+	{
+		request.setRawHeader(QByteArray("X-Riot-Entitlements-JWT"), match.captured().toUtf8());
+	}
+
+	QRegularExpression authorization(R"((?<=Authorization: )([a-z/A-Z0-9.\ \-\(\;\,\)\_]+))");
+	match = authorization.match(response);
+	if (match.hasMatch())
+	{
+		request.setRawHeader(QByteArray("Authorization"), match.captured().toUtf8());
+	}
+
+	QRegularExpression identify(R"((?<=X-Riot-RSO-Identity-JWT: )([a-z/A-Z0-9.\ \-\(\;\,\)\_]+))");
+	match = identify.match(response);
+	if (match.hasMatch())
+	{
+		request.setRawHeader(QByteArray("X-Riot-RSO-Identity-JWT"), match.captured().toUtf8());
+	}
+
+	QRegularExpression accept(R"((?<=Accept: )([a-z/A-Z0-9.\ \-\(\;\,\)]+))");
+	match = accept.match(response);
+	if (match.hasMatch())
+	{
+		request.setRawHeader(QByteArray("Accept"), match.captured().toUtf8());
+	}
+
+	manager->get(request);
 }
 
 void LoLXMPPDebugger::onFinishRequest(QNetworkReply* response)
 {
+	// modify and send the real server response back to client
 	QByteArray content = response->readAll();
-	qDebug() << "Http Received: " << response->url().toString() << QString(content);
 
-	for (QTcpSocket* socket : clients)
+	QJsonObject object = QJsonDocument::fromJson(content).object();
+	if (!object.value("chat.host").isUndefined())
 	{
-		socket->write(content);
+		object["chat.host"] = QString("127.0.0.1");
 	}
-}
-
-void LoLXMPPDebugger::newConnection()
-{
-	/*qDebug() << server->nextPendingConnection()->localAddress();
-	QTcpSocket *connection = server->nextPendingConnection();
-	if (socket->bytesAvailable() > 0)
+	if (!object.value("chat.port").isUndefined())
 	{
-		QByteArray bytes = connection->readAll();
-		ui.incomingList->addItem(bytes);
-	}*/
+		object["chat.port"] = port;
+	}
+	if (!object.value("chat.allow_bad_cert.enabled").isUndefined())
+	{
+		object["chat.allow_bad_cert.enabled"] = true;
+	}
+	if (!object.value("chat.affinities").isUndefined())
+	{
+		QJsonObject chatAffinities = object["chat.affinities"].toObject();
+		foreach (const QString& key, chatAffinities.keys())
+		{
+			chatAffinities[key] = QString("127.0.0.1");
+		}
 
+		object["chat.affinities"] = chatAffinities;
+	}
+
+
+	content = QJsonDocument(object).toJson();
+	
+	qDebug() << "HTTP Received: " << response->url().toString() << QString(content) << response->rawHeaderList();
+
+	QString message = QString("HTTP/1.1 200 OK\r\n") +
+		QString("Content-Length: ") + QString::number(content.length()) + QString("\r\n") +
+		QString("Content-Type: application/json\r\n") +
+		QString("\r\n") + QString(content);
+	leagueSocket->write(message.toUtf8());
 }
+
 
 LoLXMPPDebugger::~LoLXMPPDebugger()
 {
@@ -180,14 +193,10 @@ void LoLXMPPDebugger::on_pushButton_LaunchLeague_clicked()
 	}
 	file.close();
 
-	std::string configUrl = std::format(R"("http://127.0.0.1:{}")", port);
-	QString temp = QString::fromStdString(configUrl);
-	//QStringList args = {temp, "--launch-product=league_of_legends", "--launch-patchline=live"
-	//	,"--client-config-url=", QString::number(port)/*, "--allow-multiple-clients"*/};
 	QStringList args;
 	args << "--launch-product=league_of_legends" << "--launch-patchline=live"
-	 << QString::fromStdString(std::format("--client-config-url=http://127.0.0.1:{}", port));
-	QProcess *league = new QProcess(this);
+		<< QString::fromStdString(std::format("--client-config-url=http://127.0.0.1:{}", port));
+	QProcess* league = new QProcess(this);
 	league->startDetached(riotClientPath, args);
 	ui.statusBar->showMessage("Launching Riot Client", 5000);
 }
