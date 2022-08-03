@@ -20,13 +20,16 @@
       <property name="currentIndex">
        <number>0</number>
       </property>
-      <widget class="QWidget" name="tab_3">
+      <widget class="QWidget" name="tab_log">
+       <property name="focusPolicy">
+        <enum>Qt::NoFocus</enum>
+       </property>
        <attribute name="title">
-        <string>Tab 1</string>
+        <string>Log</string>
        </attribute>
        <layout class="QHBoxLayout" name="horizontalLayout_4">
         <item>
-         <layout class="QVBoxLayout" name="verticalLayout">
+         <layout class="QVBoxLayout" name="incomingVerticalLayout">
           <item>
            <widget class="QLabel" name="incomingLabel">
             <property name="text">
@@ -45,7 +48,7 @@
            </widget>
           </item>
           <item>
-           <layout class="QHBoxLayout" name="horizontalLayout_3">
+           <layout class="QHBoxLayout" name="incomingHorizontalLayout_bottom">
             <item>
              <widget class="QPushButton" name="incomingButtonClear">
               <property name="text">
@@ -54,7 +57,7 @@
              </widget>
             </item>
             <item>
-             <spacer name="horizontalSpacer_2">
+             <spacer name="incomingHorizontalSpacer">
               <property name="orientation">
                <enum>Qt::Horizontal</enum>
               </property>
@@ -84,7 +87,7 @@
          </layout>
         </item>
         <item>
-         <layout class="QVBoxLayout" name="verticalLayout_2">
+         <layout class="QVBoxLayout" name="outgoingVerticalLayout">
           <item>
            <widget class="QLabel" name="outgoingLabel">
             <property name="text">
@@ -106,7 +109,7 @@
            </widget>
           </item>
           <item>
-           <layout class="QHBoxLayout" name="horizontalLayout">
+           <layout class="QHBoxLayout" name="outgoingHorizontalLayout">
             <item>
              <widget class="QPushButton" name="outgoingButtonClear">
               <property name="sizePolicy">
@@ -121,7 +124,7 @@
              </widget>
             </item>
             <item>
-             <spacer name="horizontalSpacer">
+             <spacer name="outgoingHorizontalSpacer">
               <property name="orientation">
                <enum>Qt::Horizontal</enum>
               </property>
@@ -154,9 +157,9 @@
          </layout>
         </item>
         <item>
-         <layout class="QVBoxLayout" name="verticalLayout_3">
+         <layout class="QVBoxLayout" name="buttonsVerticalLayout">
           <item>
-           <widget class="QPushButton" name="pushButton">
+           <widget class="QPushButton" name="pushButton_Test">
             <property name="text">
              <string>Test</string>
             </property>
@@ -173,9 +176,19 @@
         </item>
        </layout>
       </widget>
-      <widget class="QWidget" name="tab_4">
+      <widget class="QWidget" name="tab_mitm">
        <attribute name="title">
-        <string>Tab 2</string>
+        <string>MITM</string>
+       </attribute>
+      </widget>
+      <widget class="QWidget" name="tab_custom">
+       <attribute name="title">
+        <string>Composer</string>
+       </attribute>
+      </widget>
+      <widget class="QWidget" name="tab_clientless">
+       <attribute name="title">
+        <string>Clientless</string>
        </attribute>
       </widget>
      </widget>
@@ -191,7 +204,7 @@
      <x>0</x>
      <y>0</y>
      <width>698</width>
-     <height>22</height>
+     <height>21</height>
     </rect>
    </property>
    <property name="defaultUp">
@@ -208,9 +221,9 @@
      <property name="title">
       <string>Save</string>
      </property>
-     <addaction name="actionIncoming"/>
-     <addaction name="actionOutgoing"/>
-     <addaction name="actionBoth"/>
+     <addaction name="actionSaveIncoming"/>
+     <addaction name="actionSaveOutgoing"/>
+     <addaction name="actionSaveBoth"/>
      <addaction name="separator"/>
      <addaction name="actionChoose_directory"/>
     </widget>
@@ -239,17 +252,17 @@
     <string>About</string>
    </property>
   </action>
-  <action name="actionIncoming">
+  <action name="actionSaveIncoming">
    <property name="text">
     <string>Incoming</string>
    </property>
   </action>
-  <action name="actionOutgoing">
+  <action name="actionSaveOutgoing">
    <property name="text">
     <string>Outgoing</string>
    </property>
   </action>
-  <action name="actionBoth">
+  <action name="actionSaveBoth">
    <property name="text">
     <string>Both</string>
    </property>
