@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>698</width>
-    <height>496</height>
+    <width>919</width>
+    <height>519</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -18,14 +18,14 @@
     <item>
      <widget class="QTabWidget" name="tabWidget">
       <property name="currentIndex">
-       <number>0</number>
+       <number>2</number>
       </property>
-      <widget class="QWidget" name="tab_log">
+      <widget class="QWidget" name="tab_xmpp">
        <property name="focusPolicy">
         <enum>Qt::NoFocus</enum>
        </property>
        <attribute name="title">
-        <string>Log</string>
+        <string>XMPP</string>
        </attribute>
        <layout class="QHBoxLayout" name="horizontalLayout_4">
         <item>
@@ -157,13 +157,16 @@
          </layout>
         </item>
         <item>
-         <layout class="QVBoxLayout" name="buttonsVerticalLayout">
+         <layout class="QVBoxLayout" name="verticalLayout_2">
           <item>
-           <widget class="QPushButton" name="pushButton_Test">
+           <widget class="QLabel" name="viewLabel">
             <property name="text">
-             <string>Test</string>
+             <string>View</string>
             </property>
            </widget>
+          </item>
+          <item>
+           <widget class="QTextEdit" name="viewTextEdit"/>
           </item>
           <item>
            <widget class="QPushButton" name="pushButton_LaunchLeague">
@@ -172,14 +175,83 @@
             </property>
            </widget>
           </item>
+          <item>
+           <widget class="QPushButton" name="pushButton_Test">
+            <property name="text">
+             <string>PushButton</string>
+            </property>
+           </widget>
+          </item>
          </layout>
         </item>
        </layout>
+      </widget>
+      <widget class="QWidget" name="tab_rtmp">
+       <property name="layoutDirection">
+        <enum>Qt::LeftToRight</enum>
+       </property>
+       <attribute name="title">
+        <string>RTMP</string>
+       </attribute>
+       <layout class="QHBoxLayout" name="horizontalLayout_6"/>
       </widget>
       <widget class="QWidget" name="tab_mitm">
        <attribute name="title">
         <string>MITM</string>
        </attribute>
+       <layout class="QHBoxLayout" name="horizontalLayout_7">
+        <item>
+         <widget class="QTableWidget" name="tableWidget">
+          <property name="maximumSize">
+           <size>
+            <width>394</width>
+            <height>16777215</height>
+           </size>
+          </property>
+          <column>
+           <property name="text">
+            <string>Active</string>
+           </property>
+          </column>
+          <column>
+           <property name="text">
+            <string>XMPP/RTMP</string>
+           </property>
+          </column>
+         </widget>
+        </item>
+        <item>
+         <layout class="QVBoxLayout" name="verticalLayout">
+          <item>
+           <widget class="QLabel" name="label">
+            <property name="text">
+             <string>Contains</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QTextEdit" name="textEdit"/>
+          </item>
+          <item>
+           <widget class="QLabel" name="label_2">
+            <property name="text">
+             <string>Change to</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QTextEdit" name="textEdit_2"/>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <widget class="QPushButton" name="mitmTestbutton">
+          <property name="text">
+           <string>PushButton</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
       </widget>
       <widget class="QWidget" name="tab_custom">
        <attribute name="title">
@@ -203,7 +275,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>698</width>
+     <width>919</width>
      <height>21</height>
     </rect>
    </property>
