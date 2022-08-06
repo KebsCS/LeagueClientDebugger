@@ -44,6 +44,7 @@ class ConfigProxy():
             self.transport.close()
 
         def edit_config(self, config):
+            print(config)
 
             if "chat.use_tls.enabled" in config:
                 config["chat.use_tls.enabled"] = False

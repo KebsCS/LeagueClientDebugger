@@ -1,5 +1,4 @@
 import asyncio, ssl
-import __main__
 
 # Proxy server
 class ProtocolToServer(asyncio.Protocol):
@@ -23,11 +22,14 @@ class ProtocolToServer(asyncio.Protocol):
 
     def connection_lost(self, exc):
         print('[ToServer] Connection lost', exc)
+        self.client.close()
         self.on_con_lost.set_result(True)
 
 
 class ChatProxy:
     xmpp_objects = None
+    connectedServer = None
+
     def __init__(self, xmpp_objects):
         ChatProxy.xmpp_objects = xmpp_objects
 
@@ -63,6 +65,7 @@ class ChatProxy:
                     self.run_to_server(self.realHost, self.realPort, self.fromClient, data))
 
 
+
         async def run_to_server(self, host, port, client, firstReq):
             loop = asyncio.get_event_loop()
             on_con_lost = loop.create_future()
@@ -73,6 +76,8 @@ class ChatProxy:
 
             self.realServer = transport
             self.state = 1
+            ChatProxy.connectedServer = transport
+
 
             try:
                 await on_con_lost
