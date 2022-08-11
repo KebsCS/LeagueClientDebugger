@@ -221,7 +221,7 @@ class DetachableTabWidget(QtWidgets.QTabWidget):
             tabDropPos = self.mapFromGlobal(dropPos)
 
             # If the drop position is inside the DetachableTabWidget...
-            if self.rect().contains(tabDropPos):
+            if tabDropPos in self.rect():
 
                 # If the drop position is inside the tab bar area (the
                 # area to the side of the QTabBar) or there are not tabs
@@ -386,7 +386,7 @@ class DetachableTabWidget(QtWidgets.QTabWidget):
                 # Convert the move event into a drag
                 drag = QtGui.QDrag(self)
                 mimeData = QtCore.QMimeData()
-                # mimeData.setData('action', 'application/tab-detach')
+                mimeData.setData('action', b'application/tab-detach')
                 drag.setMimeData(mimeData)
                 # screen = QScreen(self.parentWidget().currentWidget().winId())
                 # Create the appearance of dragging the tab content
@@ -431,9 +431,8 @@ class DetachableTabWidget(QtWidgets.QTabWidget):
         def dragEnterEvent(self, event):
             mimeData = event.mimeData()
             formats = mimeData.formats()
-
-       #     if formats.contains('action') and mimeData.data('action') == 'application/tab-detach':
-       #       event.acceptProposedAction()
+            if 'action' in formats and mimeData.data('action') == 'application/tab-detach':
+                event.acceptProposedAction()
 
             QtWidgets.QTabBar.dragMoveEvent(self, event)
 

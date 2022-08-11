@@ -5,10 +5,14 @@ from bs4 import BeautifulSoup
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import pyqtSlot, pyqtSignal, Qt
 from PyQt5.QtCore import QObject, QProcess, QCoreApplication, QItemSelection
-from PyQt5.QtWidgets import QApplication, QMessageBox, QFileDialog, QListWidgetItem, QTableWidgetItem, QComboBox
+from PyQt5.QtWidgets import QApplication, QMessageBox, QFileDialog, QListWidgetItem, QTableWidgetItem, QComboBox, QStyleFactory
 from asyncqt import QEventLoop
 from ConfigProxy import ConfigProxy
 from ChatProxy import ChatProxy
+
+#todo, saving stuff in mitm tab to config, last custom too
+#todo, save button in custom tab and list on the left of text edits with submit button
+#todo, vairables for mitm, like $timestamp$ or some python code executing
 
 class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
 
@@ -26,30 +30,21 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
 
         self.incomingScrollToBottom.setChecked(True)
         self.outgoingScrollToBottom.setChecked(True)
-        self.mitmTableWidget.setColumnWidth(0, 40)
-        self.mitmTableWidget.setColumnWidth(1, 75)
+        self.mitmTableWidget.setColumnWidth(0, 104)
+        self.mitmTableWidget.setColumnWidth(1, 73)
         self.mitmTableWidget.setColumnWidth(2, 262)
         self.tabWidget.setMovable(True)
 
-
         palette = self.incomingList.palette()
-        listStyle = f"QListWidget::item {{ border-bottom: 1px solid {palette.midlight().color().name()}; }} QListWidget::item:selected {{ background-color: {palette.highlight().color().name()}; color: {palette.highlightedText().color().name()}; }}"
+        listStyle = f"QListWidget::item {{ border-bottom: 1px solid {palette.midlight().color().name()}; height: {self.incomingList.font().pointSizeF()*1.75}px; }} QListWidget::item:selected {{ background-color: {palette.highlight().color().name()}; color: {palette.highlightedText().color().name()}; }}"
         self.incomingList.setStyleSheet(listStyle)
         self.outgoingList.setStyleSheet(listStyle)
 
         self.LoadConfig()
 
-        self.port = self.find_free_port()
-        self.chatPort = self.find_free_port()
-
-        xmpp_objects = {"outgoingList": self.outgoingList,
+        self.xmpp_objects = {"outgoingList": self.outgoingList,
                         "incomingList": self.incomingList,
-                        "mitmTableWidget": self.mitmTableWidget,
-                        "xmppCustomTextEdit": self.xmppCustomTextEdit}
-
-        configProxy = ConfigProxy(self.chatPort, xmpp_objects)
-        loop = asyncio.get_event_loop()
-        loop.create_task(configProxy.run_server("127.0.0.1", self.port))
+                        "mitmTableWidget": self.mitmTableWidget}
 
 
     def find_free_port(self):
@@ -62,30 +57,35 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
 
     def pretty_xml(self, text):
         #todo, find a better lib
-        bs = BeautifulSoup(text, features="xml")
-        pretty = bs.prettify()
-        if '<?xml version="1.0" encoding="UTF-8"?>' not in text:
-            pretty = pretty.replace('<?xml version="1.0" encoding="utf-8"?>\n', '')
-        else:
-            pretty = pretty.replace('<?xml version="1.0" encoding="utf-8"?>\n',
-                                    '<?xml version="1.0" encoding="UTF-8"?>\n')
-        if not pretty:
-            pretty = text
-        return pretty
+        return text
+        # bs = BeautifulSoup(text, features="xml")
+        # pretty = bs.prettify()
+        # if '<?xml version="1.0" encoding="UTF-8"?>' not in text:
+        #     pretty = pretty.replace('<?xml version="1.0" encoding="utf-8"?>\n', '')
+        # else:
+        #     pretty = pretty.replace('<?xml version="1.0" encoding="utf-8"?>\n',
+        #                             '<?xml version="1.0" encoding="UTF-8"?>\n')
+        # if not pretty:
+        #     pretty = text
+        # return pretty
 
     @pyqtSlot(QTableWidgetItem)
     def on_mitmTableWidget_itemChanged(self, item: QTableWidgetItem):
+        if item.row() != self.mitmSelectedRow:
+            return
         if item.column() == 2: # Contains
-            self.mitmContainsTextEdit.setText(item.text())
-        elif item.column() == 3: #
-            self.mitmChangeTextEdit.setText(item.text())
+            if not self.mitmContainsTextEdit.hasFocus():
+                self.mitmContainsTextEdit.setText(item.text())
+        elif item.column() == 3:
+            if not self.mitmChangeTextEdit.hasFocus():
+                self.mitmChangeTextEdit.setText(item.text())
 
     mitmSelectedRow = 0
 
     @pyqtSlot()
     def on_mitmTableWidget_itemSelectionChanged(self):
         model = self.mitmTableWidget.selectionModel()
-        if model.selectedRows() == 0:
+        if len(model.selectedRows()) == 0 or model.selectedRows() == 0:
             return
         self.mitmSelectedRow = model.selectedRows()[0].row()
         containsCell = self.mitmTableWidget.item(self.mitmSelectedRow, 2)
@@ -95,35 +95,43 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
 
     @pyqtSlot()
     def on_mitmContainsTextEdit_textChanged(self):
-        self.mitmTableWidget.item(self.mitmSelectedRow, 2).setText(self.mitmContainsTextEdit.toPlainText())
+        if self.mitmSelectedRow != None:
+            self.mitmTableWidget.item(self.mitmSelectedRow, 2).setText(self.mitmContainsTextEdit.toPlainText())
 
     @pyqtSlot()
     def on_mitmChangeTextEdit_textChanged(self):
-        self.mitmTableWidget.item(self.mitmSelectedRow, 3).setText(self.mitmChangeTextEdit.toPlainText())
+        if self.mitmSelectedRow != None:
+            self.mitmTableWidget.item(self.mitmSelectedRow, 3).setText(self.mitmChangeTextEdit.toPlainText())
 
     @pyqtSlot()
-    def on_mitmTestbutton_clicked(self):
+    def on_mitmAddButton_clicked(self):
         rowCount = self.mitmTableWidget.rowCount()
         columnCount = self.mitmTableWidget.columnCount()
         self.mitmTableWidget.insertRow(rowCount)
 
-        item = QTableWidgetItem()
-        item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
-        item.setCheckState(Qt.Unchecked)
-        self.mitmTableWidget.setItem(rowCount, 0, item)
+        combo = QComboBox()
+        combo.addItem("Request")
+        combo.addItem("Response")
+        self.mitmTableWidget.setCellWidget(rowCount, 0, combo)
 
         combo = QComboBox()
         combo.addItem("XMPP")
         combo.addItem("RTMP")
         self.mitmTableWidget.setCellWidget(rowCount, 1, combo)
 
-        self.mitmTableWidget.setItem(rowCount, 2, QTableWidgetItem(""))
+        item = QTableWidgetItem("")
+        #item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
+        item.setCheckState(Qt.Unchecked)
+        self.mitmTableWidget.setItem(rowCount, 2, item)
+
         self.mitmTableWidget.setItem(rowCount, 3, QTableWidgetItem(""))
 
-        # for column in range(self.mitmTableWidget.columnCount()):
-        #     columndWidth = self.mitmTableWidget.columnWidth(column)
-        #     print(column, columndWidth)
-        # print(self.mitmTableWidget.width())
+        for row in range(self.mitmTableWidget.rowCount()):
+            print(self.mitmTableWidget.cellWidget(row, 0).currentText(), self.mitmTableWidget.cellWidget(row, 1).currentText(),
+                  self.mitmTableWidget.item(row, 2).checkState(),self.mitmTableWidget.item(row, 2).text() ,self.mitmTableWidget.item(row, 3).text())
+            # if self.mitmTableWidget.cellWidget(row, 0).currentText() == "Request":
+            #     if self.mitmTableWidget.cellWidget(row, 1).currentText() == "XMPP":
+            #         print(row, self.mitmTableWidget.item(row, 2).checkState(), self.mitmTableWidget.item(row, 2).text())
 
     @pyqtSlot()
     def on_xmppCustomPushButton_clicked(self):
@@ -131,8 +139,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
         if serv:
             text = self.xmppCustomTextEdit.toPlainText()
             serv.write(text.encode("UTF-8"))
+
             item = QListWidgetItem()
-            # item.setBackground(Qt.yellow) # doesnt work?
             item.setForeground(Qt.blue)
             item.setText(text)
             self.incomingList.addItem(item)
@@ -147,10 +155,18 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
 
     @pyqtSlot()
     def on_pushButton_LaunchLeague_clicked(self):
+
+        self.port = self.find_free_port()
+        self.chatPort = self.find_free_port()
+
+        configProxy = ConfigProxy(self.chatPort, self.xmpp_objects)
+        loop = asyncio.get_event_loop()
+        loop.create_task(configProxy.run_server("127.0.0.1", self.port))
+
         with open("C:/ProgramData/Riot Games/RiotClientInstalls.json", 'r') as file:
             clientPath = json.load(file)["rc_default"]
             league = QProcess(None)
-            args = [f'--launch-product=league_of_legends', '--launch-patchline=live', f'--client-config-url=http://127.0.0.1:{self.port}']
+            args = ['--allow-multiple-clients', f'--launch-product=league_of_legends', '--launch-patchline=live', f'--client-config-url=http://127.0.0.1:{self.port}']
             league.startDetached(clientPath, args)
 
     @pyqtSlot()
@@ -168,6 +184,15 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
         if self.saveDir[-1] != "/":
             self.saveDir += "/"
         self.SaveConfig()
+
+    @pyqtSlot(bool)
+    def on_actionStay_on_top_triggered(self, checked):
+        if checked:
+            self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
+            self.show()
+        else:
+            self.setWindowFlags(self.windowFlags() & ~Qt.WindowStaysOnTopHint)
+            self.show()
 
     @pyqtSlot()
     def on_pushButton_Test_clicked(self):

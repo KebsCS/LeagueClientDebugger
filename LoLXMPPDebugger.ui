@@ -87,6 +87,12 @@
             <property name="textElideMode">
              <enum>Qt::ElideNone</enum>
             </property>
+            <property name="resizeMode">
+             <enum>QListView::Fixed</enum>
+            </property>
+            <property name="uniformItemSizes">
+             <bool>false</bool>
+            </property>
             <property name="wordWrap">
              <bool>false</bool>
             </property>
@@ -154,6 +160,9 @@
             <property name="textElideMode">
              <enum>Qt::ElideNone</enum>
             </property>
+            <property name="uniformItemSizes">
+             <bool>false</bool>
+            </property>
             <property name="wordWrap">
              <bool>false</bool>
             </property>
@@ -217,7 +226,11 @@
            </widget>
           </item>
           <item>
-           <widget class="QTextEdit" name="viewTextEdit"/>
+           <widget class="QTextEdit" name="viewTextEdit">
+            <property name="acceptRichText">
+             <bool>false</bool>
+            </property>
+           </widget>
           </item>
           <item>
            <widget class="QPushButton" name="pushButton_LaunchLeague">
@@ -309,26 +322,35 @@
              </size>
             </property>
             <property name="horizontalScrollBarPolicy">
-             <enum>Qt::ScrollBarAlwaysOff</enum>
+             <enum>Qt::ScrollBarAlwaysOn</enum>
+            </property>
+            <property name="autoScroll">
+             <bool>false</bool>
             </property>
             <property name="autoScrollMargin">
              <number>16</number>
             </property>
+            <property name="dragDropOverwriteMode">
+             <bool>false</bool>
+            </property>
             <property name="selectionMode">
-             <enum>QAbstractItemView::ExtendedSelection</enum>
+             <enum>QAbstractItemView::SingleSelection</enum>
             </property>
             <property name="selectionBehavior">
              <enum>QAbstractItemView::SelectRows</enum>
+            </property>
+            <property name="horizontalScrollMode">
+             <enum>QAbstractItemView::ScrollPerPixel</enum>
             </property>
             <property name="showGrid">
              <bool>true</bool>
             </property>
             <property name="cornerButtonEnabled">
-             <bool>true</bool>
+             <bool>false</bool>
             </property>
             <column>
              <property name="text">
-              <string>Active</string>
+              <string>Request/Response</string>
              </property>
             </column>
             <column>
@@ -373,17 +395,28 @@
            </widget>
           </item>
           <item>
-           <widget class="QTextEdit" name="mitmContainsTextEdit"/>
+           <widget class="QTextEdit" name="mitmContainsTextEdit">
+            <property name="acceptRichText">
+             <bool>false</bool>
+            </property>
+           </widget>
           </item>
           <item>
            <widget class="QLabel" name="mitmChangeLabel">
+            <property name="enabled">
+             <bool>true</bool>
+            </property>
             <property name="text">
              <string>Change to</string>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="QTextEdit" name="mitmChangeTextEdit"/>
+           <widget class="QTextEdit" name="mitmChangeTextEdit">
+            <property name="acceptRichText">
+             <bool>false</bool>
+            </property>
+           </widget>
           </item>
          </layout>
         </item>
@@ -416,23 +449,11 @@
            </widget>
           </item>
           <item>
-           <widget class="QTextEdit" name="xmppCustomCommunication">
-            <property name="sizePolicy">
-             <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-              <horstretch>0</horstretch>
-              <verstretch>0</verstretch>
-             </sizepolicy>
-            </property>
-            <property name="maximumSize">
-             <size>
-              <width>0</width>
-              <height>0</height>
-             </size>
+           <widget class="QTextEdit" name="xmppCustomTextEdit">
+            <property name="acceptRichText">
+             <bool>false</bool>
             </property>
            </widget>
-          </item>
-          <item>
-           <widget class="QTextEdit" name="xmppCustomTextEdit"/>
           </item>
           <item>
            <widget class="QPushButton" name="xmppCustomPushButton">
@@ -456,7 +477,14 @@
            </widget>
           </item>
           <item>
-           <widget class="QTextEdit" name="rtmpCustomTextEdit"/>
+           <widget class="QTextEdit" name="rtmpCustomTextEdit">
+            <property name="acceptRichText">
+             <bool>false</bool>
+            </property>
+            <property name="placeholderText">
+             <string>WIP</string>
+            </property>
+           </widget>
           </item>
           <item>
            <widget class="QPushButton" name="rtmpCustomPushButton">
@@ -506,6 +534,7 @@
      <addaction name="actionChoose_directory"/>
     </widget>
     <addaction name="menuSave"/>
+    <addaction name="actionStay_on_top"/>
     <addaction name="separator"/>
     <addaction name="actionAbout"/>
     <addaction name="actionExit"/>
@@ -551,6 +580,14 @@
   <action name="actionChoose_directory">
    <property name="text">
     <string>Choose directory</string>
+   </property>
+  </action>
+  <action name="actionStay_on_top">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Stay on top</string>
    </property>
   </action>
  </widget>

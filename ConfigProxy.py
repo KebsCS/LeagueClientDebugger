@@ -1,5 +1,6 @@
-import asyncio, requests, re, json, base64
+import asyncio, requests, re, json, base64,os
 from ChatProxy import ChatProxy
+os.environ['no_proxy'] = '*'
 
 
 class ConfigProxy():
@@ -44,7 +45,21 @@ class ConfigProxy():
             self.transport.close()
 
         def edit_config(self, config):
-            print(config)
+            print(json.dumps(config, indent=4))
+
+            if "keystone.products.league_of_legends.patchlines.live" in config:
+                if "platforms" in config["keystone.products.league_of_legends.patchlines.live"]:
+                    for node in config["keystone.products.league_of_legends.patchlines.live"]["platforms"]["win"]["configurations"]:
+                        if not node:
+                            continue
+                        if "arguments" in node["launcher"]: pass
+                            #node["launcher"]["arguments"].append("--allow-running-insecure-content")
+
+            if "keystone.client.feature_flags.chrome_devtools.enabled" in config:
+                config["keystone.client.feature_flags.chrome_devtools.enabled"] = True
+
+            if "keystone.client.feature_flags.flaggedNameModal.disabled" in config:
+                config["keystone.client.feature_flags.flaggedNameModal.disabled"] = True
 
             if "chat.use_tls.enabled" in config:
                 config["chat.use_tls.enabled"] = False
@@ -58,7 +73,7 @@ class ConfigProxy():
                 config["chat.allow_bad_cert.enabled"] = True
             if "chat.affinities" in config:
                 if "chat.affinity.enabled" in config and self.originalChatHost == "":
-                    pas = requests.get(ConfigProxy.geoPasUrl, headers={"Authorization": self.authorizationBearer})
+                    pas = requests.get(ConfigProxy.geoPasUrl, headers={"Authorization": self.authorizationBearer}, )
                     affinity = json.loads((base64.b64decode(str(pas.text).split('.')[1] + '==')))["affinity"]
                     self.originalChatHost = config["chat.affinities"][affinity]
 
