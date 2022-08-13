@@ -10,7 +10,6 @@ from asyncqt import QEventLoop
 from ConfigProxy import ConfigProxy
 from ChatProxy import ChatProxy
 
-#todo, saving stuff in mitm tab to config, last custom too
 #todo, save button in custom tab and list on the left of text edits with submit button
 #todo, vairables for mitm, like $timestamp$ or some python code executing
 
@@ -54,6 +53,10 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
 
 
     #region QT slots
+
+    def closeEvent(self, event):
+       self.SaveConfig()
+       event.accept()
 
     def pretty_xml(self, text):
         #todo, find a better lib
@@ -171,7 +174,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
 
     @pyqtSlot()
     def on_actionExit_triggered(self):
-        QApplication.quit()
+        QApplication.closeAllWindows()
 
     @pyqtSlot()
     def on_actionAbout_triggered(self):
@@ -257,7 +260,21 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
             try:
                 data = json.load(configFile)
 
-                self.saveDir = data["saveDir"]
+                if data["saveDir"]:
+                    self.saveDir = data["saveDir"]
+                if data["mitm"]:
+                    for rule in data["mitm"]:
+                        self.on_mitmAddButton_clicked()
+                        row = self.mitmTableWidget.rowCount()-1
+                        self.mitmTableWidget.cellWidget(row, 0).setCurrentText(rule["type"])
+                        self.mitmTableWidget.cellWidget(row, 1).setCurrentText(rule["protocol"])
+                        self.mitmTableWidget.item(row, 2).setCheckState(rule["enabled"])
+                        self.mitmTableWidget.item(row, 2).setText(rule["contains"])
+                        self.mitmTableWidget.item(row, 3).setText(rule["changeto"])
+
+                if data["custom_xmpp"]:
+                    self.xmppCustomTextEdit.setText(data["custom_xmpp"])
+
 
             except (json.decoder.JSONDecodeError, KeyError, io.UnsupportedOperation):
                 pass
@@ -267,6 +284,16 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
             data = json.load(configFile) if os.stat(self.configFileName).st_size != 0 else {}
 
             data['saveDir'] = self.saveDir
+            data["mitm"] = []
+            for row in range(self.mitmTableWidget.rowCount()):
+                rule = {"type": self.mitmTableWidget.cellWidget(row, 0).currentText(),
+                        "protocol": self.mitmTableWidget.cellWidget(row, 1).currentText(),
+                        "enabled": self.mitmTableWidget.item(row, 2).checkState(),
+                        "contains": self.mitmTableWidget.item(row, 2).text(),
+                        "changeto": self.mitmTableWidget.item(row, 3).text()}
+                data["mitm"].append(rule)
+
+            data["custom_xmpp"] = self.xmppCustomTextEdit.toPlainText()
 
             configFile.seek(0)
             json.dump(data, configFile, indent=4)

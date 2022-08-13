@@ -55,11 +55,11 @@ class ConfigProxy():
                         if "arguments" in node["launcher"]: pass
                             #node["launcher"]["arguments"].append("--allow-running-insecure-content")
 
-            if "keystone.client.feature_flags.chrome_devtools.enabled" in config:
-                config["keystone.client.feature_flags.chrome_devtools.enabled"] = True
-
-            if "keystone.client.feature_flags.flaggedNameModal.disabled" in config:
-                config["keystone.client.feature_flags.flaggedNameModal.disabled"] = True
+            # if "keystone.client.feature_flags.chrome_devtools.enabled" in config:
+            #     config["keystone.client.feature_flags.chrome_devtools.enabled"] = True
+            #
+            # if "keystone.client.feature_flags.flaggedNameModal.disabled" in config:
+            #     config["keystone.client.feature_flags.flaggedNameModal.disabled"] = True
 
             if "chat.use_tls.enabled" in config:
                 config["chat.use_tls.enabled"] = False
@@ -73,7 +73,7 @@ class ConfigProxy():
                 config["chat.allow_bad_cert.enabled"] = True
             if "chat.affinities" in config:
                 if "chat.affinity.enabled" in config and self.originalChatHost == "":
-                    pas = requests.get(ConfigProxy.geoPasUrl, headers={"Authorization": self.authorizationBearer}, )
+                    pas = requests.get(ConfigProxy.geoPasUrl, headers={"Authorization": self.authorizationBearer})
                     affinity = json.loads((base64.b64decode(str(pas.text).split('.')[1] + '==')))["affinity"]
                     self.originalChatHost = config["chat.affinities"][affinity]
 
