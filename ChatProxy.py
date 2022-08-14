@@ -143,11 +143,11 @@ class ChatProxy:
     async def run_from_client(self, host, port, realHost, realPort):
         loop = asyncio.get_running_loop()
 
-        # context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
-        # context.load_cert_chain(certfile="public.cer", keyfile="private.key")
+        #context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+        #context.load_cert_chain(certfile="public.cer", keyfile="private.key")
         server = await loop.create_server(
             lambda: self.ProtocolFromClient(realHost, realPort),
-            host, port) #, ssl=context)
+            host, port)#, ssl=context)
 
 
         print('[FromClient] Server started on ' + host + ':' + str(port))

@@ -1,4 +1,4 @@
-import asyncio, requests, re, json, base64,os
+import asyncio, requests, re, json, base64,os, yaml
 from ChatProxy import ChatProxy
 os.environ['no_proxy'] = '*'
 
@@ -52,8 +52,8 @@ class ConfigProxy():
                     for node in config["keystone.products.league_of_legends.patchlines.live"]["platforms"]["win"]["configurations"]:
                         if not node:
                             continue
-                        if "arguments" in node["launcher"]: pass
-                            #node["launcher"]["arguments"].append("--allow-running-insecure-content")
+                        if "arguments" in node["launcher"]:
+                            node["launcher"]["arguments"].append('--system-yaml-override="Config/system.yaml"')
 
             # if "keystone.client.feature_flags.chrome_devtools.enabled" in config:
             #     config["keystone.client.feature_flags.chrome_devtools.enabled"] = True

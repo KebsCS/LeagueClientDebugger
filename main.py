@@ -1,5 +1,5 @@
 from LoLXMPPDebugger import Ui_LoLXMPPDebuggerClass
-import sys, json, time, os, io, threading, asyncio, socket
+import sys, json, time, os, io, threading, asyncio, socket, yaml
 from datetime import datetime
 from bs4 import BeautifulSoup
 from PyQt5 import QtWidgets
@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import QApplication, QMessageBox, QFileDialog, QListWidgetI
 from asyncqt import QEventLoop
 from ConfigProxy import ConfigProxy
 from ChatProxy import ChatProxy
+from LcdsProxy import LcdsProxy
 
 #todo, save button in custom tab and list on the left of text edits with submit button
 #todo, vairables for mitm, like $timestamp$ or some python code executing
@@ -45,6 +46,26 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
                         "incomingList": self.incomingList,
                         "mitmTableWidget": self.mitmTableWidget}
 
+        self.edit_system_yaml()
+
+        #todo get realhost from yaml
+        lcdsProxy = LcdsProxy()
+        loop = asyncio.get_event_loop()
+        loop.create_task(
+            lcdsProxy.run_from_client("127.0.0.1", 2099, "prod.euw1.lol.riotgames.com", 2099))
+
+    def edit_system_yaml(self, port=2099):
+        with open('C:\Riot Games\League of Legends\system.yaml', "r") as f:
+            data = yaml.safe_load(f)
+            if "region_data" in data:
+                for region in data["region_data"]:
+                    if "servers" in data["region_data"][region]:
+                        if "lcds" in data["region_data"][region]["servers"]:
+                            data["region_data"][region]["servers"]["lcds"]["lcds_host"] = "127.0.0.1"
+                            data["region_data"][region]["servers"]["lcds"]["lcds_port"] = port
+                            data["region_data"][region]["servers"]["lcds"]["use_tls"] = False
+                with open('C:\Riot Games\League of Legends\Config\system.yaml', 'w') as outfile:
+                    yaml.dump(data, outfile)
 
     def find_free_port(self):
         with socket.socket() as s:
@@ -129,9 +150,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
 
         self.mitmTableWidget.setItem(rowCount, 3, QTableWidgetItem(""))
 
-        for row in range(self.mitmTableWidget.rowCount()):
-            print(self.mitmTableWidget.cellWidget(row, 0).currentText(), self.mitmTableWidget.cellWidget(row, 1).currentText(),
-                  self.mitmTableWidget.item(row, 2).checkState(),self.mitmTableWidget.item(row, 2).text() ,self.mitmTableWidget.item(row, 3).text())
+        # for row in range(self.mitmTableWidget.rowCount()):
+        #     print(self.mitmTableWidget.cellWidget(row, 0).currentText(), self.mitmTableWidget.cellWidget(row, 1).currentText(),
+        #           self.mitmTableWidget.item(row, 2).checkState(),self.mitmTableWidget.item(row, 2).text() ,self.mitmTableWidget.item(row, 3).text())
             # if self.mitmTableWidget.cellWidget(row, 0).currentText() == "Request":
             #     if self.mitmTableWidget.cellWidget(row, 1).currentText() == "XMPP":
             #         print(row, self.mitmTableWidget.item(row, 2).checkState(), self.mitmTableWidget.item(row, 2).text())
@@ -260,9 +281,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
             try:
                 data = json.load(configFile)
 
-                if data["saveDir"]:
+                if "saveDir" in data:
                     self.saveDir = data["saveDir"]
-                if data["mitm"]:
+                if "mitm" in data:
                     for rule in data["mitm"]:
                         self.on_mitmAddButton_clicked()
                         row = self.mitmTableWidget.rowCount()-1
@@ -272,7 +293,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
                         self.mitmTableWidget.item(row, 2).setText(rule["contains"])
                         self.mitmTableWidget.item(row, 3).setText(rule["changeto"])
 
-                if data["custom_xmpp"]:
+                if "custom_xmpp" in data:
                     self.xmppCustomTextEdit.setText(data["custom_xmpp"])
 
 
