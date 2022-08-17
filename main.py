@@ -10,6 +10,9 @@ from asyncqt import QEventLoop
 from ConfigProxy import ConfigProxy
 from ChatProxy import ChatProxy
 from LcdsProxy import LcdsProxy
+from rtmppython import rtmp_protocol, rtmp_protocol_base
+from RtmpReader import RtmpReader
+import pyamf
 
 #todo, save button in custom tab and list on the left of text edits with submit button
 #todo, vairables for mitm, like $timestamp$ or some python code executing

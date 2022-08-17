@@ -4,6 +4,14 @@ from pyamf import amf0,remoting
 from pyamf import *
 from rtmplite3 import *
 #pyamf.register_class(messaging.AsyncMessage, 'flex.messaging.messages.AsyncMessage')
+from rtmppython import rtmp_protocol, rtmp_protocol_base
+import logging
+from RtmpReader import RtmpReader
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
 
 
 # Proxy server
@@ -19,6 +27,11 @@ class ProtocolToServer(asyncio.Protocol):
         print(f'[LcdsToServer] Connected {peername}')
         self.transport = transport
 
+        self.stream = pyamf.util.BufferedByteStream()
+        self.reader = rtmp_protocol.RtmpReader(self.stream)
+        self.stream.truncate(0)
+        self.stream.seek(0)
+
         # connection is made after the first request was already sent
         transport.write(self.firstReq)
 
@@ -33,7 +46,9 @@ class ProtocolToServer(asyncio.Protocol):
         # self.buffer.seek(0)
         # msg = self.decoder.readElement()
 
-
+        self.stream.write(data)
+        self.stream.seek(0)
+        print(self.reader.next())
 
         self.client.write(data)
 
@@ -62,6 +77,9 @@ class LcdsProxy:
             print(f'[LcdsFromClient] Connection from {peername}')
             self.fromClient = transport
 
+            self.stream = pyamf.util.BufferedByteStream()
+            self.reader = rtmp_protocol.RtmpReader(self.stream)
+
 
         def connection_lost(self, exc):
             print('[LcdsFromClient] Connection lost', exc)
@@ -79,6 +97,10 @@ class LcdsProxy:
             # self.buffer.write(data)
             # self.buffer.seek(0)
             # msg = self.decoder.readElement()
+
+            # self.stream.append(data)
+            # print(self.reader.next())
+
 
             if self.state == 1:
                 self.realServer.write(data)

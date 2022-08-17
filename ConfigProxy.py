@@ -1,4 +1,4 @@
-import asyncio, requests, re, json, base64,os, yaml
+import asyncio, requests, re, json, base64, os
 from ChatProxy import ChatProxy
 os.environ['no_proxy'] = '*'
 

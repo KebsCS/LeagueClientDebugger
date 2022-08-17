@@ -12,7 +12,7 @@ class ProtocolToServer(asyncio.Protocol):
 
     def connection_made(self, transport):
         peername = transport.get_extra_info('peername')
-        print(f'[ToServer] Connected {peername}')
+        # print(f'[ToServer] Connected {peername}')
         self.transport = transport
 
         item = QListWidgetItem()
@@ -25,7 +25,7 @@ class ProtocolToServer(asyncio.Protocol):
 
     def data_received(self, data):
         received = data.decode("UTF-8")
-        print(f'[ToServer] Received: received {received}')
+        # print(f'[ToServer] Received: received {received}')
         item = QListWidgetItem()
 
         # MITM
@@ -45,7 +45,7 @@ class ProtocolToServer(asyncio.Protocol):
         self.client.write(received.encode("UTF-8"))
 
     def connection_lost(self, exc):
-        print('[ToServer] Connection lost', exc)
+        # print('[ToServer] Connection lost', exc)
 
         item = QListWidgetItem()
         item.setForeground(Qt.red)
@@ -73,7 +73,7 @@ class ChatProxy:
 
         def connection_made(self, transport):
             peername = transport.get_extra_info('peername')
-            print(f'[FromClient] Connection from {peername}')
+            # print(f'[FromClient] Connection from {peername}')
             self.fromClient = transport
 
             item = QListWidgetItem()
@@ -83,7 +83,7 @@ class ChatProxy:
 
 
         def connection_lost(self, exc):
-            print('[FromClient] Connection lost', exc)
+            # print('[FromClient] Connection lost', exc)
 
             item = QListWidgetItem()
             item.setForeground(Qt.red)
@@ -96,7 +96,7 @@ class ChatProxy:
 
         def data_received(self, data):
             received = data.decode("UTF-8")
-            print(f'[FromClient] Data received: {received}')
+            # print(f'[FromClient] Data received: {received}')
             item = QListWidgetItem()
 
             # MITM
