@@ -1,69 +1,198 @@
 import asyncio, requests, re, json, base64, os
 from ChatProxy import ChatProxy
-os.environ['no_proxy'] = '*'
+from SystemYaml import SystemYaml
+from HttpProxy import HttpProxy
+from ProxyServers import ProxyServers
 
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 class ConfigProxy():
-    clientConfigUrl = "https://clientconfig.rpg.riotgames.com"
-    geoPasUrl = "https://riot-geo.pas.si.riotgames.com/pas/v1/service/chat"
     chatPort = 0
 
+    ledgePort = 0
+    entitlementsPort = 0
+    player_platformPort = 0
+    playerpreferencesPort = 0
+    geoPort = 0
+    authPort = 0
+    authenticatorPort = 0
+
     chatProxyRunning = False
+
+    full_config = {}
 
     def __init__(self, chatPort, xmpp_objects):
         ConfigProxy.chatPort = chatPort
         ConfigProxy.xmpp_objects = xmpp_objects
 
-    class CustomProtocol(asyncio.Protocol):
+
+    # todo move to ProxyServers.py
+    def set_ledge_port(self, port):
+        ConfigProxy.ledgePort = port
+
+    def set_entitlements_port(self, port):
+        ConfigProxy.entitlementsPort = port
+
+    def set_player_platform_port(self, port):
+        ConfigProxy.player_platformPort = port
+
+    def set_playerpreferences_port(self, port):
+        ConfigProxy.playerpreferencesPort = port
+
+    def set_geo_port(self, port):
+        ConfigProxy.geoPort = port
+
+    class CustomProtocol(HttpProxy.CustomProtocol):
 
         originalChatHost = ""
         originalChatPort = 0
-        authorizationBearer = ""
 
-        def connection_made(self, transport):
-            peername = transport.get_extra_info('peername')
-            print('[ConfigProxy] Connection from {}'.format(peername))
-            self.transport = transport
+        def edit_response(self, response: requests.Response) -> requests.Response:
+            originalConfig = response.json()
+            config = json.dumps(self.edit_config(originalConfig))
 
-        def data_received(self, data):
-            message = data.decode("UTF-8")
-            print('[ConfigProxy] Data received: {!r}'.format(message))
+            config = config.replace("https://playerpreferences.riotgames.com",
+                                    f"http://localhost:{ConfigProxy.playerpreferencesPort}")
 
-            originalConfig = self.proxy_get_config(message).json()
-            config = self.edit_config(originalConfig)
+            config = config.replace("https://api.account.riotgames.com",
+                                    f"http://localhost:{ProxyServers.accounts_port}")
 
-            message = "HTTP/1.1 200 OK\r\n" \
-                      f"Content-Length: {len(json.dumps(config))}\r\n" \
-                      "Content-Type: application/json\r\n" \
-                      "\r\n" \
-                      f"{json.dumps(config)}"
+            config = config.replace("https://content.publishing.riotgames.com",
+                                    f"http://localhost:{ProxyServers.publishing_content_port}")
 
-            print('[ConfigProxy] Sent modified config back')
-            self.transport.write(message.encode("UTF-8"))
+            config = re.sub(r"https://\w+-\w+\.pp\.sgp\.pvp\.net", f"http://localhost:{ConfigProxy.player_platformPort}", config) #pp.sgp.pvp.net
 
-            print('[ConfigProxy] Closed the client socket')
-            self.transport.close()
+            config = re.sub(r"https://\w+\.ledge\.leagueoflegends\.com",
+                            f"http://localhost:{ConfigProxy.ledgePort}", config)
+
+            config = config.replace("https://scd.riotcdn.net",
+                                    f"http://localhost:{ProxyServers.scd_port}")
+
+            config = config.replace("https://player-lifecycle-euc.publishing.riotgames.com",
+                                    f"http://localhost:{ProxyServers.lifecycle_port}")
+
+            config = config.replace("https://eu.lers.loyalty.riotgames.com",
+                                    f"http://localhost:{ProxyServers.loyalty_port}")
+
+            config = config.replace("https://pcbs.loyalty.riotgames.com",
+                                    f"http://localhost:{ProxyServers.pcbs_loyalty_port}")
+
+            #print(config)
+            response._content = config.encode()
+            return response
 
         def edit_config(self, config):
-            print(json.dumps(config, indent=4))
+            for key in config.keys():
+                if key not in ConfigProxy.full_config:
+                    ConfigProxy.full_config[key] = config[key]
 
             if "keystone.products.league_of_legends.patchlines.live" in config:
                 if "platforms" in config["keystone.products.league_of_legends.patchlines.live"]:
                     for node in config["keystone.products.league_of_legends.patchlines.live"]["platforms"]["win"]["configurations"]:
                         if not node:
                             continue
-                        if "arguments" in node["launcher"]:
-                            node["launcher"]["arguments"].append('--system-yaml-override="Config/system.yaml"')
+                        # if "arguments" in node["launcher"]:
+                        #     node["launcher"]["arguments"].append('--system-yaml-override="Config/system.yaml"')
 
-            # if "keystone.client.feature_flags.chrome_devtools.enabled" in config:
-            #     config["keystone.client.feature_flags.chrome_devtools.enabled"] = True
+            def ReplaceValue(key: str, value):
+                if key in config:
+                    config[key] = value
+
+            def update_nested_keys(key_to_match, new_value, d=config):
+                for key, value in d.items():
+                    if isinstance(value, dict):
+                        update_nested_keys(key_to_match, new_value, value)
+                    elif key_to_match in key:
+                        d[key] = new_value
+
+            ReplaceValue("keystone.client.feature_flags.chrome_devtools.enabled", True)
+
+            ReplaceValue("lol.client_settings.honeyfruit.account_claiming_enabled", True)
+            ReplaceValue("lol.client_settings.honeyfruit.linking_settings_button_available", True)
+
+            ReplaceValue("lol.client_settings.patch.retrieve_all_supported_game_versions", True)
+            ReplaceValue("lol.client_settings.player_behavior.display_reform_card", True)
+            ReplaceValue("lol.client_settings.progression.player_platform_edge.enabled", True)
+            ReplaceValue("lol.client_settings.purchase_widget.player_platform_edge.enabled", True)
+            ReplaceValue("lol.client_settings.store.enableCodesPage", True)
+            ReplaceValue("lol.client_settings.store.enableTransfers", True)
+            ReplaceValue("lol.client_settings.store.enableRPPurchase", True)
+
+            update_nested_keys("PlayerBehavior", True)
+            update_nested_keys("isSpectatorDelayConfigurable", True)
+            update_nested_keys("isUsingOperationalConfig", True)
+
+            if "lol.game_client_settings.tft_npe" in config:
+                config["lol.game_client_settings.tft_npe"]["queueBypass"] = True
+                config["lol.game_client_settings.tft_npe"]["shouldShowNPEQueue"] = True
+
+            if "lol.client_settings.tft.tft_npe" in config:
+                config["lol.client_settings.tft.tft_npe"]["queueBypass"] = True
+                config["lol.client_settings.tft.tft_npe"]["shouldShowNPEQueue"] = True
+
+            if "lol.client_settings.yourshop" in config:
+                config["lol.client_settings.yourshop"]["Active"] = True
+
+            ReplaceValue("lol.client_settings.champ_mastery.lcm_enabled", True)
+            ReplaceValue("lol.client_settings.collections.lcm_eat_enabled", True)
+
+            if "lol.client_settings.store.primeGamingPromo" in config:
+                config["lol.client_settings.store.primeGamingPromo"]["active"] = True
+
+            ReplaceValue("lol.client_settings.summoner.profile_privacy_feature_flag", "ENABLED")
+
+            ReplaceValue("lol.client_settings.tft.tft_tastes_experiment_enabled", True)
+            ReplaceValue("lol.client_settings.topNavUpdates.profileButtonMigration", True)
+            # ReplaceValue("lol.client_settings.vanguard.enabled", True)
+
+            if "lol.euw1.operational.spectator" in config:
+                config["lol.euw1.operational.spectator"]["enabled"] = True
+
+            # if "lol.euw1.operational.vanguard" in config:
+            #     config["lol.euw1.operational.vanguard"]["enabled"] = True
+
+            ReplaceValue("lol.game_client_settings.mobile_tft_loadout_favorites", True)
+            if "lol.game_client_settings.pregame_rpd_config" in config:
+                config["lol.game_client_settings.pregame_rpd_config"]["enabled"] = True
+                config["lol.game_client_settings.pregame_rpd_config"]["save"] = True
+                config["lol.game_client_settings.pregame_rpd_config"]["send"] = True
+
+            # -------------- Important below
+
+            # if "keystone.rewards.productConfig.league_of_legends" in config: # could be old ledge "https://br.ledge.leagueoflegends.com"
+            #     for server in config["keystone.rewards.productConfig.league_of_legends"]:
+            #         config["keystone.rewards.productConfig.league_of_legends"][server]["serviceUrl"] = f"http://localhost:{ConfigProxy.ledgePort}"
             #
-            # if "keystone.client.feature_flags.flaggedNameModal.disabled" in config:
-            #     config["keystone.client.feature_flags.flaggedNameModal.disabled"] = True
+            # ReplaceValue("keystone.rewards.service_url", f"http://localhost:{ConfigProxy.ledgePort}")
 
+
+
+            if "keystone.rso_auth.url" in config:
+                config["keystone.rso_auth.url"] = f"http://localhost:{ConfigProxy.authPort}"
+
+            if "keystone.rso-authenticator.service_url" in config:
+                config["keystone.rso-authenticator.service_url"] = f"http://localhost:{ConfigProxy.authenticatorPort}"
+
+            for key in config.keys():
+                if ".player_platform_edge.url" in key:
+                    config[key] = f"http://localhost:{ConfigProxy.player_platformPort}"
+
+                if ".league_edge.url" in key:
+                    config[key] = f"http://localhost:{ConfigProxy.ledgePort}"
+
+                if ".use_ledge" in key:
+                    config[key] = True
+
+            if "keystone.entitlements.url" in config:
+                config["keystone.entitlements.url"] = re.sub(r'^(https?://[^/]+)', f"http://localhost:{ConfigProxy.entitlementsPort}", config["keystone.entitlements.url"])
+
+            if "keystone.player-affinity.playerAffinityServiceURL" in config:
+                if HttpProxy.geoPasUrl == "":
+                    HttpProxy.geoPasUrl = config["keystone.player-affinity.playerAffinityServiceURL"] + "/pas/v1/service/chat"
+                config["keystone.player-affinity.playerAffinityServiceURL"] = f"http://localhost:{ConfigProxy.geoPort}"
             if "chat.use_tls.enabled" in config:
                 config["chat.use_tls.enabled"] = False
-
             if "chat.host" in config:
                 config["chat.host"] = "127.0.0.1"
             if "chat.port" in config:
@@ -71,12 +200,16 @@ class ConfigProxy():
                 config["chat.port"] = ConfigProxy.chatPort
             if "chat.allow_bad_cert.enabled" in config:
                 config["chat.allow_bad_cert.enabled"] = True
-            if "chat.affinities" in config:
+            if "chat.affinities" in config: # todo idk why this method doesnt work
+                # if "chat.affinity.enabled" in config and self.originalChatHost == "" and HttpProxy.geoPasBody != "":
+                #     affinity = json.loads((base64.b64decode(str(HttpProxy.geoPasBody).split('.')[1] + '==')))["affinity"]
+                #     self.originalChatHost = config["chat.affinities"][affinity]
+
                 if "chat.affinity.enabled" in config and self.originalChatHost == "":
-                    pas = requests.get(ConfigProxy.geoPasUrl, headers={"Authorization": self.authorizationBearer})
+                    pas = requests.get(HttpProxy.geoPasUrl, headers={"Authorization": self.req.headers["Authorization"]},
+                                       proxies=self.proxies, verify=False)
                     affinity = json.loads((base64.b64decode(str(pas.text).split('.')[1] + '==')))["affinity"]
                     self.originalChatHost = config["chat.affinities"][affinity]
-
 
                 for host in config["chat.affinities"]:
                     config["chat.affinities"][host] = "127.0.0.1"
@@ -90,38 +223,14 @@ class ConfigProxy():
 
             return config
 
-        def proxy_get_config(self, response):
-            headers = {}
-            r = re.search(r"(?<=user-agent: )([a-z/A-Z0-9. \-(;,)]+)", response)
-            if r:
-                headers["user-agent"] = r.group(0)
-            r = re.search(r"(?<=Accept-Encoding: )([a-z/A-Z0-9. \-(;,)]+)", response)
-            if r:
-                headers["Accept-Encoding"] = r.group(0)
-            r = re.search(r"(?<=X-Riot-Entitlements-JWT: )([a-z/A-Z0-9. \-(;,)_]+)", response)
-            if r:
-                headers["X-Riot-Entitlements-JWT"] = r.group(0)
-            r = re.search(r"(?<=Authorization: )([a-z/A-Z0-9. \-(;,)_]+)", response)
-            if r:
-                self.authorizationBearer = r.group(0)
-                headers["Authorization"] = self.authorizationBearer
-            r = re.search(r"(?<=X-Riot-RSO-Identity-JWT: )([a-z/A-Z0-9. \-(;,)_]+)", response)
-            if r:
-                headers["X-Riot-RSO-Identity-JWT"] = r.group(0)
-            r = re.search(r"(?<=Accept: )([a-z/A-Z0-9. \-(;,)]+)", response)
-            if r:
-                headers["Accept"] = r.group(0)
-
-            return requests.get(ConfigProxy.clientConfigUrl + response.split(" ")[1], headers=headers)
-
     async def run_server(self, host, port):
         loop = asyncio.get_running_loop()
 
         server = await loop.create_server(
-            lambda: self.CustomProtocol(),
+            lambda: self.CustomProtocol(SystemYaml.client_config["EUW"]),
             host, port)
 
-        print('[ConfigProxy] Server started on ' + host + ':' + str(port))
+        print(f'[ConfigProxy] Config server started on {host}:{str(port)}')
 
         async with server:
             await server.serve_forever()

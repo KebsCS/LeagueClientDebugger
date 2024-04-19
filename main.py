@@ -1,5 +1,5 @@
 from LoLXMPPDebugger import Ui_LoLXMPPDebuggerClass
-import sys, json, time, os, io, threading, asyncio, socket, yaml
+import sys, json, time, os, io, threading, asyncio, socket
 from datetime import datetime
 from bs4 import BeautifulSoup
 from PyQt5 import QtWidgets
@@ -9,10 +9,15 @@ from PyQt5.QtWidgets import QApplication, QMessageBox, QFileDialog, QListWidgetI
 from asyncqt import QEventLoop
 from ConfigProxy import ConfigProxy
 from ChatProxy import ChatProxy
+from HttpProxy import HttpProxy
 from LcdsProxy import LcdsProxy
 from rtmppython import rtmp_protocol, rtmp_protocol_base
 from RtmpReader import RtmpReader
 import pyamf
+from SystemYaml import SystemYaml
+from ProxyServers import ProxyServers
+
+os.environ['no_proxy'] = '*'
 
 #todo, save button in custom tab and list on the left of text edits with submit button
 #todo, vairables for mitm, like $timestamp$ or some python code executing
@@ -49,26 +54,23 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
                         "incomingList": self.incomingList,
                         "mitmTableWidget": self.mitmTableWidget}
 
-        self.edit_system_yaml()
+        self.ledgePort = self.find_free_port()
+        self.entitlementsPort = self.find_free_port()
+        self.player_platformPort = self.find_free_port()
+        self.playerpreferencesPort = self.find_free_port()
+        self.geoPort = self.find_free_port()
 
-        #todo get realhost from yaml
-        lcdsProxy = LcdsProxy()
-        loop = asyncio.get_event_loop()
-        loop.create_task(
-            lcdsProxy.run_from_client("127.0.0.1", 2099, "prod.euw1.lol.riotgames.com", 2099))
+        SystemYaml().read()
+        SystemYaml().edit()
 
-    def edit_system_yaml(self, port=2099):
-        with open('C:\Riot Games\League of Legends\system.yaml', "r") as f:
-            data = yaml.safe_load(f)
-            if "region_data" in data:
-                for region in data["region_data"]:
-                    if "servers" in data["region_data"][region]:
-                        if "lcds" in data["region_data"][region]["servers"]:
-                            data["region_data"][region]["servers"]["lcds"]["lcds_host"] = "127.0.0.1"
-                            data["region_data"][region]["servers"]["lcds"]["lcds_port"] = port
-                            data["region_data"][region]["servers"]["lcds"]["use_tls"] = False
-                with open('C:\Riot Games\League of Legends\Config\system.yaml', 'w') as outfile:
-                    yaml.dump(data, outfile)
+
+    #todo get realhost from yaml
+        # lcdsProxy = LcdsProxy()
+        # loop = asyncio.get_event_loop()
+        # loop.create_task(
+        #     lcdsProxy.run_from_client("127.0.0.1", 2099, "prod.euw1.lol.riotgames.com", 2099))
+
+
 
     def find_free_port(self):
         with socket.socket() as s:
@@ -172,6 +174,16 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
             item.setText(text)
             self.incomingList.addItem(item)
 
+    @pyqtSlot()
+    def on_rtmpCustomPushButton_clicked(self):
+        print('asd')
+        serv = LcdsProxy.connectedServer
+        if serv:
+            text = self.rtmpCustomTextEdit.toPlainText().encode().decode('unicode_escape').encode("raw_unicode_escape")
+            print('asd2', text)
+            serv.write(text)
+
+
     @pyqtSlot(QListWidgetItem)
     def on_incomingList_itemClicked(self, item: QListWidgetItem):
         self.viewTextEdit.setText(self.pretty_xml(item.text()))
@@ -179,6 +191,13 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
     @pyqtSlot(QListWidgetItem)
     def on_outgoingList_itemClicked(self, item: QListWidgetItem):
         self.viewTextEdit.setText(self.pretty_xml(item.text()))
+
+    def start_proxy(self, origHost, port=None):
+        httpProxy = HttpProxy()
+        loop = asyncio.get_event_loop()
+        if port is None:
+            port = self.find_free_port()
+        loop.create_task(httpProxy.run_server("127.0.0.1", port, origHost))
 
     @pyqtSlot()
     def on_pushButton_LaunchLeague_clicked(self):
@@ -189,6 +208,63 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
         configProxy = ConfigProxy(self.chatPort, self.xmpp_objects)
         loop = asyncio.get_event_loop()
         loop.create_task(configProxy.run_server("127.0.0.1", self.port))
+
+        serv = "EUW"
+
+
+        #todo simplify with ProxyServers.py
+        configProxy.set_ledge_port(self.ledgePort)
+        self.start_proxy(SystemYaml.ledge[serv], self.ledgePort)
+
+        configProxy.set_entitlements_port(self.entitlementsPort)
+        self.start_proxy(SystemYaml.entitlements[serv], self.entitlementsPort)
+
+        configProxy.set_player_platform_port(self.player_platformPort)
+        self.start_proxy(SystemYaml.player_platform[serv], self.player_platformPort)
+        self.start_proxy(SystemYaml.email[serv])
+
+        configProxy.set_playerpreferences_port(self.playerpreferencesPort)
+        self.start_proxy("https://playerpreferences.riotgames.com", self.playerpreferencesPort) #todo could get url from config proxy
+
+        configProxy.set_geo_port(self.geoPort)
+        self.start_proxy("https://riot-geo.pas.si.riotgames.com", self.geoPort) #todo could get url from config proxy
+
+
+        authPort = self.find_free_port()
+        ConfigProxy.authPort = authPort
+        ProxyServers.authPort = authPort
+        self.start_proxy("https://auth.riotgames.com", authPort)  # todo could get url from config proxy
+
+        authenticatorPort = self.find_free_port()
+        ConfigProxy.authenticatorPort = authenticatorPort
+        self.start_proxy("https://authenticate.riotgames.com", authenticatorPort)  # todo could get url from config proxy
+
+        accounts_port = self.find_free_port()
+        ProxyServers.accounts_port = accounts_port
+        self.start_proxy("https://api.account.riotgames.com",
+                         accounts_port)  # todo could get url from config proxy
+
+        publishing_content_port = self.find_free_port()
+        ProxyServers.publishing_content_port = publishing_content_port
+        self.start_proxy("https://content.publishing.riotgames.com",
+                         publishing_content_port)  # todo could get url from config proxy
+
+        scd_port = self.find_free_port()
+        ProxyServers.scd_port = scd_port
+        self.start_proxy("https://scd.riotcdn.net", scd_port)  # todo could get url from config proxy
+
+        lifecycle_port = self.find_free_port()
+        ProxyServers.lifecycle_port = lifecycle_port
+        self.start_proxy("https://player-lifecycle-euc.publishing.riotgames.com", lifecycle_port)  # todo could get url from config proxy also there are different servers
+
+        loyalty_port = self.find_free_port()
+        ProxyServers.loyalty_port = loyalty_port
+        self.start_proxy("https://eu.lers.loyalty.riotgames.com", loyalty_port)
+
+        pcbs_loyalty_port = self.find_free_port()
+        ProxyServers.pcbs_loyalty_port = pcbs_loyalty_port
+        self.start_proxy("https://pcbs.loyalty.riotgames.com", pcbs_loyalty_port)
+
 
         with open("C:/ProgramData/Riot Games/RiotClientInstalls.json", 'r') as file:
             clientPath = json.load(file)["rc_default"]
@@ -226,6 +302,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
         self.incomingList.addItem("<?xml version='1.0'?><stream:stream xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams' id='152424151' from='eu1.pvp.net' version='1.0'>")
         self.outgoingList.addItem("<?xml version='1.0'?><stream:stream xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams' id='152424151' from='eu1.pvp.net' version='1.0'>")
         self.counter += 1
+        with open(f'{self.saveDir}fullconfig.txt', 'w') as file:
+            json.dump(ConfigProxy.full_config, file)
 
     @pyqtSlot()
     def on_outgoingButtonClear_clicked(self):
