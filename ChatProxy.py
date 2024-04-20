@@ -128,7 +128,7 @@ class ChatProxy:
 
             transport, protocol = await loop.create_connection(
                 lambda: ProtocolToServer(on_con_lost, client, firstReq),
-                host, port, ssl=ssl.SSLContext(protocol=ssl.PROTOCOL_TLSv1))
+                host, port, ssl=ssl.SSLContext(protocol=ssl.PROTOCOL_TLSv1_2))
 
             self.realServer = transport
             ChatProxy.connectedServer = self.realServer

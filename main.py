@@ -5,17 +5,23 @@ from bs4 import BeautifulSoup
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import pyqtSlot, pyqtSignal, Qt
 from PyQt5.QtCore import QObject, QProcess, QCoreApplication, QItemSelection
-from PyQt5.QtWidgets import QApplication, QMessageBox, QFileDialog, QListWidgetItem, QTableWidgetItem, QComboBox, QStyleFactory
-from asyncqt import QEventLoop
+from PyQt5.QtWidgets import QMessageBox, QFileDialog, QListWidgetItem, QTableWidgetItem, QComboBox, QStyleFactory
+from qasync import QEventLoop, QApplication
 from ConfigProxy import ConfigProxy
 from ChatProxy import ChatProxy
 from HttpProxy import HttpProxy
 from LcdsProxy import LcdsProxy
-from rtmppython import rtmp_protocol, rtmp_protocol_base
-from RtmpReader import RtmpReader
-import pyamf
 from SystemYaml import SystemYaml
 from ProxyServers import ProxyServers
+
+
+# import logging
+# logging.getLogger().setLevel(logging.WARNING)
+#
+# logger = logging.getLogger(__name__)
+# logger.handlers = []  # Remove all handlers
+# logger.setLevel(logging.NOTSET)
+
 
 os.environ['no_proxy'] = '*'
 
@@ -54,22 +60,17 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
                         "incomingList": self.incomingList,
                         "mitmTableWidget": self.mitmTableWidget}
 
-        self.ledgePort = self.find_free_port()
-        self.entitlementsPort = self.find_free_port()
-        self.player_platformPort = self.find_free_port()
-        self.playerpreferencesPort = self.find_free_port()
-        self.geoPort = self.find_free_port()
+        # todo maybe find free ports in ProxyServers.py
+        ProxyServers.ledge_port = self.find_free_port()
+        ProxyServers.entitlements_port = self.find_free_port()
+        ProxyServers.player_platform_port = self.find_free_port()
+        ProxyServers.playerpreferences_port = self.find_free_port()
+        ProxyServers.geo_port = self.find_free_port()
+        ProxyServers.email_port = self.find_free_port()
+        ProxyServers.payments_port = self.find_free_port()
 
         SystemYaml().read()
         SystemYaml().edit()
-
-
-    #todo get realhost from yaml
-        # lcdsProxy = LcdsProxy()
-        # loop = asyncio.get_event_loop()
-        # loop.create_task(
-        #     lcdsProxy.run_from_client("127.0.0.1", 2099, "prod.euw1.lol.riotgames.com", 2099))
-
 
 
     def find_free_port(self):
@@ -192,84 +193,75 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
     def on_outgoingList_itemClicked(self, item: QListWidgetItem):
         self.viewTextEdit.setText(self.pretty_xml(item.text()))
 
-    def start_proxy(self, origHost, port=None):
+    def start_proxy(self, original_host, port=None):
         httpProxy = HttpProxy()
         loop = asyncio.get_event_loop()
         if port is None:
             port = self.find_free_port()
-        loop.create_task(httpProxy.run_server("127.0.0.1", port, origHost))
+        loop.create_task(httpProxy.run_server("127.0.0.1", port, original_host))
 
     @pyqtSlot()
     def on_pushButton_LaunchLeague_clicked(self):
 
-        self.port = self.find_free_port()
-        self.chatPort = self.find_free_port()
-
-        configProxy = ConfigProxy(self.chatPort, self.xmpp_objects)
-        loop = asyncio.get_event_loop()
-        loop.create_task(configProxy.run_server("127.0.0.1", self.port))
-
         serv = "EUW"
 
+        ProxyServers.client_config_port = self.find_free_port()
+        ProxyServers.chat_port = self.find_free_port()
+        configProxy = ConfigProxy(ProxyServers.chat_port, self.xmpp_objects)
+        loop = asyncio.get_event_loop()
+        loop.create_task(configProxy.run_server("127.0.0.1", ProxyServers.client_config_port, SystemYaml.client_config[serv]))
 
-        #todo simplify with ProxyServers.py
-        configProxy.set_ledge_port(self.ledgePort)
-        self.start_proxy(SystemYaml.ledge[serv], self.ledgePort)
+        # todo get realhost from yaml
+        lcdsProxy = LcdsProxy()
+        loop = asyncio.get_event_loop()
+        lcds = SystemYaml.lcds[serv]
+        loop.create_task(
+            lcdsProxy.run_from_client("127.0.0.1", lcds.split(":")[1], lcds.split(":")[0], lcds.split(":")[1]))
 
-        configProxy.set_entitlements_port(self.entitlementsPort)
-        self.start_proxy(SystemYaml.entitlements[serv], self.entitlementsPort)
+        # loop = asyncio.get_event_loop()
+        # rtmpProxy = RtmpProxy()
+        # loop.create_task(rtmpProxy.create("127.0.0.1", SystemYaml.lcds[serv].split(":")[1]))
 
-        configProxy.set_player_platform_port(self.player_platformPort)
-        self.start_proxy(SystemYaml.player_platform[serv], self.player_platformPort)
-        self.start_proxy(SystemYaml.email[serv])
+        self.start_proxy(SystemYaml.ledge[serv], ProxyServers.ledge_port)
+        self.start_proxy(SystemYaml.entitlements[serv], ProxyServers.entitlements_port)
+        self.start_proxy(SystemYaml.player_platform[serv], ProxyServers.player_platform_port)
+        self.start_proxy(SystemYaml.email[serv], ProxyServers.email_port)
+        self.start_proxy(SystemYaml.payments[serv], ProxyServers.payments_port)
 
-        configProxy.set_playerpreferences_port(self.playerpreferencesPort)
-        self.start_proxy("https://playerpreferences.riotgames.com", self.playerpreferencesPort) #todo could get url from config proxy
+        #todo maybe find free ports in ProxyServers.py
 
-        configProxy.set_geo_port(self.geoPort)
-        self.start_proxy("https://riot-geo.pas.si.riotgames.com", self.geoPort) #todo could get url from config proxy
+        self.start_proxy("https://playerpreferences.riotgames.com", ProxyServers.playerpreferences_port) #todo could get url from config proxy
+        self.start_proxy("https://riot-geo.pas.si.riotgames.com", ProxyServers.geo_port) #todo could get url from config proxy
 
+        ProxyServers.auth_port = self.find_free_port()
+        self.start_proxy("https://auth.riotgames.com", ProxyServers.auth_port)  # todo could get url from config proxy
 
-        authPort = self.find_free_port()
-        ConfigProxy.authPort = authPort
-        ProxyServers.authPort = authPort
-        self.start_proxy("https://auth.riotgames.com", authPort)  # todo could get url from config proxy
+        ProxyServers.authenticator_port = self.find_free_port()
+        self.start_proxy("https://authenticate.riotgames.com", ProxyServers.authenticator_port)  # todo could get url from config proxy
 
-        authenticatorPort = self.find_free_port()
-        ConfigProxy.authenticatorPort = authenticatorPort
-        self.start_proxy("https://authenticate.riotgames.com", authenticatorPort)  # todo could get url from config proxy
+        ProxyServers.accounts_port = self.find_free_port()
+        self.start_proxy("https://api.account.riotgames.com", ProxyServers.accounts_port)  # todo could get url from config proxy
 
-        accounts_port = self.find_free_port()
-        ProxyServers.accounts_port = accounts_port
-        self.start_proxy("https://api.account.riotgames.com",
-                         accounts_port)  # todo could get url from config proxy
-
-        publishing_content_port = self.find_free_port()
-        ProxyServers.publishing_content_port = publishing_content_port
+        ProxyServers.publishing_content_port = self.find_free_port()
         self.start_proxy("https://content.publishing.riotgames.com",
-                         publishing_content_port)  # todo could get url from config proxy
+                         ProxyServers.publishing_content_port)  # todo could get url from config proxy
 
-        scd_port = self.find_free_port()
-        ProxyServers.scd_port = scd_port
-        self.start_proxy("https://scd.riotcdn.net", scd_port)  # todo could get url from config proxy
+        ProxyServers.scd_port = self.find_free_port()
+        self.start_proxy("https://scd.riotcdn.net", ProxyServers.scd_port)  # todo could get url from config proxy
 
-        lifecycle_port = self.find_free_port()
-        ProxyServers.lifecycle_port = lifecycle_port
-        self.start_proxy("https://player-lifecycle-euc.publishing.riotgames.com", lifecycle_port)  # todo could get url from config proxy also there are different servers
+        ProxyServers.lifecycle_port = self.find_free_port()
+        self.start_proxy("https://player-lifecycle-euc.publishing.riotgames.com", ProxyServers.lifecycle_port)  # todo could get url from config proxy also there are different servers
 
-        loyalty_port = self.find_free_port()
-        ProxyServers.loyalty_port = loyalty_port
-        self.start_proxy("https://eu.lers.loyalty.riotgames.com", loyalty_port)
+        ProxyServers.loyalty_port = self.find_free_port()
+        self.start_proxy("https://eu.lers.loyalty.riotgames.com", ProxyServers.loyalty_port )
 
-        pcbs_loyalty_port = self.find_free_port()
-        ProxyServers.pcbs_loyalty_port = pcbs_loyalty_port
-        self.start_proxy("https://pcbs.loyalty.riotgames.com", pcbs_loyalty_port)
-
+        ProxyServers.pcbs_loyalty_port = self.find_free_port()
+        self.start_proxy("https://pcbs.loyalty.riotgames.com", ProxyServers.pcbs_loyalty_port)
 
         with open("C:/ProgramData/Riot Games/RiotClientInstalls.json", 'r') as file:
             clientPath = json.load(file)["rc_default"]
             league = QProcess(None)
-            args = ['--allow-multiple-clients', f'--launch-product=league_of_legends', '--launch-patchline=live', f'--client-config-url=http://127.0.0.1:{self.port}']
+            args = ['--allow-multiple-clients', f'--launch-product=league_of_legends', '--launch-patchline=live', f'--client-config-url=http://127.0.0.1:{ProxyServers.client_config_port}']
             league.startDetached(clientPath, args)
 
     @pyqtSlot()
@@ -353,6 +345,14 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
         self.on_actionSaveOutgoing_triggered()
         self.on_actionSaveIncoming_triggered()
 
+    @pyqtSlot()
+    def on_httpsFiddlerButton_clicked(self):
+        ProxyServers.fiddler_proxies = {
+            'http': self.httpsFiddlerHost.toPlainText()+":"+self.httpsFiddlerPort.toPlainText(),
+            'https': self.httpsFiddlerHost.toPlainText()+":"+self.httpsFiddlerPort.toPlainText()
+        }
+        print(ProxyServers.fiddler_proxies)
+
     #endregion
 
     #region Config
@@ -377,6 +377,20 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
                 if "custom_xmpp" in data:
                     self.xmppCustomTextEdit.setText(data["custom_xmpp"])
 
+                if "fiddler_host" in data:
+                    self.httpsFiddlerHost.setText(data["fiddler_host"])
+                else:
+                    self.httpsFiddlerHost.setText("http://127.0.0.1")
+
+                if "fiddler_port" in data:
+                    self.httpsFiddlerPort.setText(data["fiddler_port"])
+                else:
+                    self.httpsFiddlerPort.setText("8888")
+
+                ProxyServers.fiddler_proxies = {
+                    'http': self.httpsFiddlerHost.toPlainText() + ":" + self.httpsFiddlerPort.toPlainText(),
+                    'https': self.httpsFiddlerHost.toPlainText() + ":" + self.httpsFiddlerPort.toPlainText()
+                }
 
             except (json.decoder.JSONDecodeError, KeyError, io.UnsupportedOperation):
                 pass
@@ -397,6 +411,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
 
             data["custom_xmpp"] = self.xmppCustomTextEdit.toPlainText()
 
+            data["fiddler_host"] = self.httpsFiddlerHost.toPlainText()
+            data["fiddler_port"] = self.httpsFiddlerPort.toPlainText()
+
             configFile.seek(0)
             json.dump(data, configFile, indent=4)
             configFile.truncate()
@@ -412,7 +429,7 @@ if __name__ == "__main__":
         sys.exit(1)
     sys.excepthook = exception_hook
 
-    app = QtWidgets.QApplication(sys.argv)
+    app = QApplication(sys.argv)
     loop = QEventLoop(app)
     asyncio.set_event_loop(loop)
     w = MainWindow()

@@ -1,9 +1,9 @@
-import asyncio, requests, os
+import asyncio, requests, os, urllib3
 from httptools import HttpRequestParser
-from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from ProxyServers import ProxyServers
 
-requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 class Request:
@@ -66,16 +66,10 @@ class HttpProxy:
     session = requests.sessions.Session()
 
     class CustomProtocol(asyncio.Protocol):
-        # fiddler
-        proxies = {
-           'http': 'http://127.0.0.1:8898',
-            'https': 'http://127.0.0.1:8898'
-        }
-
-        def __init__(self, origHost: str):
+        def __init__(self, original_host: str):
             self.parser = None
             self.req = Request()
-            self.origHost = origHost
+            self.original_host = original_host
 
         def connection_made(self, transport):
             peername = transport.get_extra_info('peername')
@@ -112,7 +106,7 @@ class HttpProxy:
         def edit_response(self, response: requests.Response) -> requests.Response:
             if response.url == "https://auth.riotgames.com/.well-known/openid-configuration":
                 response._content = response.text.replace("https://auth.riotgames.com",
-                                                     f"http://localhost:{ProxyServers.authPort}").encode()
+                                                     f"http://localhost:{ProxyServers.auth_port}").encode()
             # elif response.url == HttpProxy.geoPasUrl:
             #     HttpProxy.geoPasBody = response.text
             #     print(HttpProxy.geoPasBody)
@@ -128,26 +122,26 @@ class HttpProxy:
             self.transport.write(response)
 
         def on_message_complete(self):
-            self.req.headers["Host"] = self.origHost.split("//")[1]
+            self.req.headers["Host"] = self.original_host.split("//")[1]
             self.req.url = "https://" + self.req.headers["Host"] + self.req.url
 
             self.req = self.edit_request(self.req)
 
             response = HttpProxy.session.request(self.req.method, self.req.url, headers=self.req.headers, data=self.req.body,
-                                        proxies=self.proxies, verify=False)
+                                        proxies=ProxyServers.fiddler_proxies, verify=False)
 
             response = self.edit_response(response)
 
             self.send_response(response)
 
-    async def run_server(self, host, port, origHost):
+    async def run_server(self, host, port, original_host):
         loop = asyncio.get_running_loop()
 
         server = await loop.create_server(
-            lambda: self.CustomProtocol(origHost),
+            lambda: self.CustomProtocol(original_host),
             host, port)
 
-        print(f'[HttpProxy] {origHost} server started on {host}:{str(port)}')
+        print(f'[HttpProxy] {original_host} server started on {host}:{str(port)}')
 
         async with server:
             await server.serve_forever()

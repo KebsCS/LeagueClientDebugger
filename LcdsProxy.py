@@ -1,18 +1,62 @@
-import asyncio, ssl
-import pyamf
-from pyamf import amf0,remoting
-from pyamf import *
-from rtmplite3 import *
-#pyamf.register_class(messaging.AsyncMessage, 'flex.messaging.messages.AsyncMessage')
-from rtmppython import rtmp_protocol, rtmp_protocol_base
-import logging
-from RtmpReader import RtmpReader
-
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+import asyncio, ssl, pyamf
+from pyamf import remoting
+from pyamf.remoting import *
+from pyamf import amf0
 
 
+def my_read(self, n=-1):
+    """
+    Reads C{n} bytes from the stream.
+    """
+    if n < -1:
+        raise IOError('Cannot read backwards')
+
+    # bytes = self._buffer.read(n)
+    buffer = b""
+    while n != 0:
+        byte = self._buffer.read(1)
+        if byte == b'\xc3':    # no idea why client adds c3 randomly
+            byte = self._buffer.read(1)
+        if not byte:
+            break
+        buffer += byte
+        n -= 1
+
+    return buffer
+
+
+pyamf.remoting.util.pure.BytesIOProxy.read = my_read
+
+
+class TypedObject(dict):
+    def __init__(self, *arg, **kw):
+        super(TypedObject, self).__init__(*arg, **kw)
+
+counter = 0
+def decode(data):
+    global counter
+    counter += 1
+    if counter > 6:
+        try:
+            stream = pyamf.util.BufferedByteStream(data)
+
+            decoder = pyamf.amf0.Decoder(stream=stream)
+            context = decoder.context
+
+            obj = TypedObject()
+            if decoder.stream.peek(1) == b'\x00':
+                obj["version"] = 0x00
+                decoder.stream.read(1)
+
+            obj["result"] = decoder.readElement()
+            obj["invokeId"] = decoder.readElement()
+            obj["serviceCall"] = decoder.readElement()
+            obj["data"] = decoder.readElement()
+            print(obj)
+            if stream.at_eof():
+                print("at end")
+        except:
+            print("failed")
 
 # Proxy server
 class ProtocolToServer(asyncio.Protocol):
@@ -27,28 +71,19 @@ class ProtocolToServer(asyncio.Protocol):
         print(f'[LcdsToServer] Connected {peername}')
         self.transport = transport
 
-        self.stream = pyamf.util.BufferedByteStream()
-        self.reader = rtmp_protocol.RtmpReader(self.stream)
-        self.stream.truncate(0)
-        self.stream.seek(0)
-
         # connection is made after the first request was already sent
         transport.write(self.firstReq)
 
-    chunkSize = 128
     def data_received(self, data):
-        #received = data.decode("UTF-8")
-        print(f'[LcdsToServer] Received: received {data}')
+        formatted_bytes = ", ".join([f"0x{byte:02X}" for byte in data[12:]])
+        print(f'[LcdsToServer] Received: received {formatted_bytes}')
+        print(data)
 
-        # self.decoder = pyamf.get_decoder(pyamf.AMF3)
-        # self.buffer = self.decoder.stream
-        # self.buffer.write(data)
-        # self.buffer.seek(0)
-        # msg = self.decoder.readElement()
+        # todo, if request is too long it sends it in multiple reuqests, join them and then decode
+        # if b"ClientDynamicConfigurationNotification" in data:
+        #     print(len(data))
 
-        self.stream.write(data)
-        self.stream.seek(0)
-        print(self.reader.next())
+        decode(data[12:])
 
         self.client.write(data)
 
@@ -61,8 +96,6 @@ class ProtocolToServer(asyncio.Protocol):
 
 class LcdsProxy:
     connectedServer = None
-
-    #def __init__(self):
 
     # Incoming from client
     class ProtocolFromClient(asyncio.Protocol):
@@ -77,10 +110,6 @@ class LcdsProxy:
             print(f'[LcdsFromClient] Connection from {peername}')
             self.fromClient = transport
 
-            self.stream = pyamf.util.BufferedByteStream()
-            self.reader = rtmp_protocol.RtmpReader(self.stream)
-
-
         def connection_lost(self, exc):
             print('[LcdsFromClient] Connection lost', exc)
 
@@ -89,18 +118,11 @@ class LcdsProxy:
                 self.state = 0
 
         def data_received(self, data):
-            #received = data.decode("UTF-8")
-            print(f'[LcdsFromClient] Data received: {data}')
+            formatted_bytes = ", ".join([f"0x{byte:02X}" for byte in data[12:]])
+            print(f'[LcdsFromClient] Data received: {formatted_bytes}')
+            print(data)
 
-            # self.decoder = pyamf.get_decoder(pyamf.AMF3)
-            # self.buffer = self.decoder.stream
-            # self.buffer.write(data)
-            # self.buffer.seek(0)
-            # msg = self.decoder.readElement()
-
-            # self.stream.append(data)
-            # print(self.reader.next())
-
+            decode(data[12:])
 
             if self.state == 1:
                 self.realServer.write(data)
@@ -116,7 +138,7 @@ class LcdsProxy:
 
             transport, protocol = await loop.create_connection(
                 lambda: ProtocolToServer(on_con_lost, client, firstReq),
-                host, port, ssl=ssl.SSLContext(protocol=ssl.PROTOCOL_TLSv1))
+                host, port, ssl=ssl.SSLContext(protocol=ssl.PROTOCOL_TLSv1_2))
 
             self.realServer = transport
             LcdsProxy.connectedServer = self.realServer
@@ -131,14 +153,11 @@ class LcdsProxy:
     async def run_from_client(self, host, port, realHost, realPort):
         loop = asyncio.get_running_loop()
 
-        #context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
-        #context.load_cert_chain(certfile="public.cer", keyfile="private.key")
         server = await loop.create_server(
             lambda: self.ProtocolFromClient(realHost, realPort),
-            host, port)#, ssl=context)
+            host, port)
 
-
-        print('[FromClient] Server started on ' + host + ':' + str(port))
+        print('[LcdsFromClient] Server started on ' + host + ':' + str(port))
 
         async with server:
             await server.serve_forever()
