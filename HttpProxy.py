@@ -85,7 +85,11 @@ class HttpProxy:
             if self.parser is None:
                 self.parser = HttpRequestParser(self)
 
-            self.parser.feed_data(data)
+            try:
+                self.parser.feed_data(data)
+            except Exception as e:
+                print("[HttpProxy] feed_data failed", e)
+                print(data)
 
         def on_url(self, url):
             self.req = Request()

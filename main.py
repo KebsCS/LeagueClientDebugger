@@ -10,7 +10,7 @@ from qasync import QEventLoop, QApplication
 from ConfigProxy import ConfigProxy
 from ChatProxy import ChatProxy
 from HttpProxy import HttpProxy
-from LcdsProxy import LcdsProxy
+from RtmpProxy import RtmpProxy
 from SystemYaml import SystemYaml
 from ProxyServers import ProxyServers
 
@@ -178,11 +178,11 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
     @pyqtSlot()
     def on_rtmpCustomPushButton_clicked(self):
         print('asd')
-        serv = LcdsProxy.connectedServer
-        if serv:
-            text = self.rtmpCustomTextEdit.toPlainText().encode().decode('unicode_escape').encode("raw_unicode_escape")
-            print('asd2', text)
-            serv.write(text)
+        # serv = RtmpProxy.connectedServer
+        # if serv:
+        #     text = self.rtmpCustomTextEdit.toPlainText().encode().decode('unicode_escape').encode("raw_unicode_escape")
+        #     print('asd2', text)
+        #     serv.write(text)
 
 
     @pyqtSlot(QListWidgetItem)
@@ -212,11 +212,11 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
         loop.create_task(configProxy.run_server("127.0.0.1", ProxyServers.client_config_port, SystemYaml.client_config[serv]))
 
         # todo get realhost from yaml
-        lcdsProxy = LcdsProxy()
+        rtmp_proxy = RtmpProxy()
         loop = asyncio.get_event_loop()
         lcds = SystemYaml.lcds[serv]
         loop.create_task(
-            lcdsProxy.run_from_client("127.0.0.1", lcds.split(":")[1], lcds.split(":")[0], lcds.split(":")[1]))
+            rtmp_proxy.start_client_proxy("127.0.0.1", lcds.split(":")[1], lcds.split(":")[0], lcds.split(":")[1]))
 
         # loop = asyncio.get_event_loop()
         # rtmpProxy = RtmpProxy()
