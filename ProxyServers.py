@@ -18,3 +18,4 @@ class ProxyServers:
     geo_port = 0
     auth_port = 0
     authenticator_port = 0
+    rms_port = 0

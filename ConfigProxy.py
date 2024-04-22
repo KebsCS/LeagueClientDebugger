@@ -53,6 +53,9 @@ class ConfigProxy:
             config = config.replace("https://pcbs.loyalty.riotgames.com",
                                     f"http://localhost:{ProxyServers.pcbs_loyalty_port}")
 
+            config = re.sub(r"(wss://([a-z]{2,4})\.edge\.rms\.si\.riotgames\.com)",
+                            f"ws://127.0.0.1", config)
+
             #todo "payments.pay_plugin.pmc-edge-url-template": "https://edge.%1.pmc.pay.riotgames.com",
 
             #print(config)
@@ -129,6 +132,12 @@ class ConfigProxy:
 
 
             # -------------- Important below
+
+            ReplaceValue("rms.allow_bad_cert.enabled", True)
+            ReplaceValue("rms.port", str(ProxyServers.rms_port))
+
+
+
 
             if "keystone.products.league_of_legends.patchlines.live" in config:
                 if "platforms" in config["keystone.products.league_of_legends.patchlines.live"]:

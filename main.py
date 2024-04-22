@@ -1,7 +1,6 @@
 from LoLXMPPDebugger import Ui_LoLXMPPDebuggerClass
 import sys, json, time, os, io, threading, asyncio, socket
 from datetime import datetime
-from bs4 import BeautifulSoup
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import pyqtSlot, pyqtSignal, Qt
 from PyQt5.QtCore import QObject, QProcess, QCoreApplication, QItemSelection
@@ -13,7 +12,8 @@ from HttpProxy import HttpProxy
 from RtmpProxy import RtmpProxy
 from SystemYaml import SystemYaml
 from ProxyServers import ProxyServers
-
+from UiObjects import UiObjects
+from RmsProxy import RmsProxy
 
 # import logging
 # logging.getLogger().setLevel(logging.WARNING)
@@ -54,6 +54,16 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
         self.incomingList.setStyleSheet(listStyle)
         self.outgoingList.setStyleSheet(listStyle)
 
+        self.rtmpList.setStyleSheet(listStyle)
+        UiObjects.rtmpList = self.rtmpList
+        self.rtmpList.currentItemChanged.connect(self.on_rtmpList_itemClicked)
+        self.rtmpScrollToBottom.setChecked(True)
+
+        self.rmsList.setStyleSheet(listStyle)
+        UiObjects.rmsList = self.rmsList
+        self.rmsList.currentItemChanged.connect(self.on_rmsList_itemClicked)
+        self.rmsScrollToBottom.setChecked(True)
+
         self.LoadConfig()
 
         self.xmpp_objects = {"outgoingList": self.outgoingList,
@@ -68,6 +78,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
         ProxyServers.geo_port = self.find_free_port()
         ProxyServers.email_port = self.find_free_port()
         ProxyServers.payments_port = self.find_free_port()
+
+
 
         SystemYaml().read()
         SystemYaml().edit()
@@ -193,6 +205,32 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
     def on_outgoingList_itemClicked(self, item: QListWidgetItem):
         self.viewTextEdit.setText(self.pretty_xml(item.text()))
 
+    @pyqtSlot(QListWidgetItem)
+    def on_rtmpList_itemClicked(self):
+        # todo, is called twice, from itemClicked and selectionchanged
+        # workaround because selectionchanged works only after it has been selected at least once
+        if len(self.rtmpList.selectedItems()) == 0:
+            return
+        item = self.rtmpList.selectedItems()[0]
+        if item.data(257):
+            self.rtmpView.setText(item.data(257))
+            return
+        pretty_item = json.dumps(json.loads(item.data(256)), indent=4)
+        self.rtmpView.setText(pretty_item)
+
+    @pyqtSlot(QListWidgetItem)
+    def on_rmsList_itemClicked(self):
+        # todo, is called twice, from itemClicked and selectionchanged
+        # workaround because selectionchanged works only after it has been selected at least once
+        if len(self.rmsList.selectedItems()) == 0:
+            return
+        item = self.rmsList.selectedItems()[0]
+        if item.data(257):
+            self.rmsView.setText(item.data(257))
+            return
+        pretty_item = json.dumps(json.loads(item.data(256)), indent=4)
+        self.rmsView.setText(pretty_item)
+
     def start_proxy(self, original_host, port=None):
         httpProxy = HttpProxy()
         loop = asyncio.get_event_loop()
@@ -210,6 +248,14 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
         configProxy = ConfigProxy(ProxyServers.chat_port, self.xmpp_objects)
         loop = asyncio.get_event_loop()
         loop.create_task(configProxy.run_server("127.0.0.1", ProxyServers.client_config_port, SystemYaml.client_config[serv]))
+
+        ProxyServers.rms_port = self.find_free_port()
+        rms_url = SystemYaml.rms[serv]
+        parts = rms_url.split(":", 2)
+        rms_url = ":".join(parts[:2])
+        rms_proxy = RmsProxy(rms_url)
+        loop = asyncio.get_event_loop()
+        loop.create_task(rms_proxy.start_proxy())
 
         # todo get realhost from yaml
         rtmp_proxy = RtmpProxy()
@@ -305,6 +351,12 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
     def on_incomingButtonClear_clicked(self):
         self.incomingList.clear()
 
+    def on_rtmpButtonClear_clicked(self):
+        self.rtmpList.clear()
+
+    def on_rmsButtonClear_clicked(self):
+        self.rmsList.clear()
+
     def scroll_func_outgoing(self):
         self.outgoingList.scrollToBottom()
 
@@ -323,6 +375,26 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
             self.incomingList.model().rowsInserted.connect(self.scroll_func_incoming)
         else:
             self.incomingList.model().rowsInserted.disconnect(self.scroll_func_incoming)
+
+    def scroll_func_rtmp(self):
+        self.rtmpList.scrollToBottom()
+
+    @pyqtSlot(bool)
+    def on_rtmpScrollToBottom_toggled(self, checked):
+        if checked:
+            self.rtmpList.model().rowsInserted.connect(self.scroll_func_rtmp)
+        else:
+            self.rtmpList.model().rowsInserted.disconnect(self.scroll_func_rtmp)
+
+    def scroll_func_rms(self):
+        self.rmsList.scrollToBottom()
+
+    @pyqtSlot(bool)
+    def on_rmsScrollToBottom_toggled(self, checked):
+        if checked:
+            self.rmsList.model().rowsInserted.connect(self.scroll_func_rms)
+        else:
+            self.rmsList.model().rowsInserted.disconnect(self.scroll_func_rms)
 
     @pyqtSlot()
     def on_actionSaveOutgoing_triggered(self):
