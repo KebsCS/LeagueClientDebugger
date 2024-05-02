@@ -2,7 +2,6 @@ import asyncio, ssl, pyamf, datetime
 import pyamf.flex
 import pyamf.amf0
 from pyamf.flex import messaging
-from ast import literal_eval
 from UiObjects import *
 
 from json import JSONEncoder
@@ -36,13 +35,13 @@ def typed_object_repr(self):
 
 pyamf.TypedObject.__repr__ = typed_object_repr
 
-# def typed_object_init(self, alias):
-#     dict.__init__(self)
-#
-#     self.alias = alias
-#     self["__class"] = alias
-#
-# pyamf.TypedObject.__init__ = typed_object_init
+def typed_object_init(self, alias):
+    dict.__init__(self)
+
+    self.alias = alias
+    self["__class"] = alias
+
+pyamf.TypedObject.__init__ = typed_object_init
 
 # flex.messaging.io.ArrayCollection crashes
 pyamf.unregister_class("flex.messaging.io.ArrayCollection")
@@ -77,6 +76,40 @@ def abstract_message_repr(self):
 
 pyamf.flex.messaging.AbstractMessage.__repr__ = abstract_message_repr
 pyamf.flex.messaging.AbstractMessage.to_json = abstract_message_to_json
+
+
+def log_message(parser, is_outgoing):
+    current_message = parser.current_message_parsed if parser.current_message_parsed else str(
+        parser.current_message)
+
+    #print('[RTMP] ' + ('>' if is_outgoing else '<') + " " + str(parser.current_message))
+
+    current_time = datetime.datetime.now().strftime("%H:%M:%S")
+    text = "[OUT] " if is_outgoing else "[IN]     "
+    text += f"[{current_time}] "
+    if parser.current_message_parsed:
+        item = QListWidgetItem()
+
+        json_msg = json.loads(json.dumps(current_message))
+        invoke_id = json_msg.get("invokeId", "") or ""
+        text += f"{invoke_id} "
+
+        if "data" in json_msg:
+            messaging = json_msg["data"].get("__class", "") or ""
+            messaging = messaging.split('.')[-1].replace("Message", "").replace("Acknowledge", "Ack")
+            destination = json_msg["data"].get("destination", "") or ""
+            operation = json_msg["data"].get("operation", "") or ""
+            text += f"{messaging} {destination} {operation}"
+
+        item.setText(text)
+        item.setData(256, json.dumps(current_message))
+
+        UiObjects.rtmpList.addItem(item)
+    else:
+        item = QListWidgetItem()
+        item.setText(text)
+        item.setData(257, str(parser.current_message))
+        UiObjects.rtmpList.addItem(item)
 
 
 class RtmpParser:
@@ -208,26 +241,7 @@ class ProtocolFromServer(asyncio.Protocol):
             self.parser = RtmpParser()
 
         while self.parser.feed_data(data):
-            current_message = self.parser.current_message_parsed if self.parser.current_message_parsed else str(self.parser.current_message)
-            #print(f'[RTMP] < {current_message}')
-
-            current_time = datetime.datetime.now().strftime("%H:%M:%S")
-            if self.parser.current_message_parsed:
-                item = QListWidgetItem()
-                json_msg = json.loads(json.dumps(current_message))
-
-                invoke_id = json_msg.get("invokeId", "")
-                destination = json_msg["data"].get("destination", "")
-                operation = json_msg["data"].get("operation", "")
-
-                item.setText(f"[IN]     [{current_time}] {invoke_id} {destination} {operation}")
-                item.setData(256, json.dumps(current_message))
-                UiObjects.rtmpList.addItem(item)
-            else:
-                item = QListWidgetItem()
-                item.setText(f"[IN]     [{current_time}]")
-                item.setData(257, str(self.parser.current_message))
-                UiObjects.rtmpList.addItem(item)
+            log_message(self.parser, False)
 
             self.league_client.write(self.parser.current_message)
 
@@ -239,11 +253,7 @@ class ProtocolFromServer(asyncio.Protocol):
         self.league_client.close()
         self.on_con_lost.set_result(True)
 
-        item = QListWidgetItem()
-        item.setForeground(Qt.red)
-        item.setText("Connection lost")
-        item.setData(257, " ")
-        UiObjects.rtmpList.addItem(item)
+        UiObjects.add_disconnected_item(UiObjects.rtmpList)
 
 
 class RtmpProxy:
@@ -266,11 +276,7 @@ class RtmpProxy:
             print(f'[RTMP] League client connected to proxy {peername}')
             RtmpParser.counter = 0
 
-            item = QListWidgetItem()
-            item.setForeground(Qt.green)
-            item.setText("Connected")
-            item.setData(257, " ")
-            UiObjects.rtmpList.addItem(item)
+            UiObjects.add_connected_item(UiObjects.rtmpList)
 
         def connection_lost(self, exc):
             print('[RTMP] Connection lost with league client', exc)
@@ -287,28 +293,7 @@ class RtmpProxy:
 
             # while loop because there still might be some unsent data left
             while self.parser.feed_data(data):
-                current_message = self.parser.current_message_parsed if self.parser.current_message_parsed else str(self.parser.current_message)
-                #print(f'[RTMP] > {current_message}')
-                current_time = datetime.datetime.now().strftime("%H:%M:%S")
-                if self.parser.current_message_parsed:
-                    item = QListWidgetItem()
-
-                    json_msg = json.loads(json.dumps(current_message))
-
-                    invoke_id = json_msg.get("invokeId", "")
-                    destination = json_msg["data"].get("destination", "")
-                    operation = json_msg["data"].get("operation", "")
-
-                    item.setText(f"[OUT] [{current_time}] {invoke_id} {destination} {operation}")
-                    item.setData(256, json.dumps(current_message))
-
-                    UiObjects.rtmpList.addItem(item)
-                else:
-                    item = QListWidgetItem()
-                    item.setText(f"[OUT] [{current_time}]")
-                    item.setData(257, str(self.parser.current_message))
-                    UiObjects.rtmpList.addItem(item)
-
+                log_message(self.parser, True)
                 if self.is_connected:
                     self.real_server.write(self.parser.current_message)
                 else:

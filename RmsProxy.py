@@ -1,4 +1,4 @@
-import asyncio, websockets, gzip, re, datetime, json
+import asyncio, websockets, gzip, re, datetime
 
 from ProxyServers import ProxyServers
 from UiObjects import *
@@ -8,12 +8,6 @@ class RmsProxy:
         self.real_host = real_host
 
     async def handle_connection(self, ws, path):
-        item = QListWidgetItem()
-        item.setForeground(Qt.green)
-        item.setText("Connected")
-        item.setData(257, " ")
-        UiObjects.rmsList.addItem(item)
-
         target_hostname = self.real_host
 
         req_headers = dict(ws.request_headers)
@@ -30,6 +24,8 @@ class RmsProxy:
             del req_headers['origin']
 
         ws.useragent = re.search(r"(?<=\) ).+/.", req_headers["user-agent"]).group()
+
+        UiObjects.add_connected_item(UiObjects.rmsList, str(ws.useragent), json.dumps(req_headers, indent=4))
 
         ws.target_ws_buffer = []
 
@@ -55,11 +51,7 @@ class RmsProxy:
                     await ws.send(message)
             except websockets.ConnectionClosed as e:
                 print("[RMS] Connection closed ", e)
-                item = QListWidgetItem()
-                item.setForeground(Qt.red)
-                item.setText("Connection lost")
-                item.setData(257, " ")
-                UiObjects.rmsList.addItem(item)
+                UiObjects.add_disconnected_item(UiObjects.rmsList)
 
 
         async with websockets.connect(target_hostname + path, extra_headers=req_headers) as target_ws:
@@ -71,12 +63,10 @@ class RmsProxy:
 
     async def log_message(self, message, is_outgoing, source):
         display_message = message
-        is_gzipped = False
 
         if isinstance(message, bytes):
             if message[0] == 0x1F and message[1] == 0x8B and message[2] == 0x08:    # gzip file format header
                 display_message = gzip.decompress(display_message)
-                is_gzipped = True
 
         display_message = display_message if isinstance(message, str) else display_message.decode('utf-8')
         #print('[RMS] ' + ('>' if is_outgoing else '<') + " " + source + display_message)

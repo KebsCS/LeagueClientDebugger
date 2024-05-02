@@ -4,7 +4,7 @@ class ProxyServers:
     accounts_port = 0
     publishing_content_port = 0
     scd_port = 0
-    sieve_port = 0 #"https://sieve.services.riotcdn.net",
+    sieve_port = 0 #"https://sieve.services.riotcdn.net", todo it has patch versions
     lifecycle_port = 0
     loyalty_port = 0
     pcbs_loyalty_port = 0
@@ -19,3 +19,4 @@ class ProxyServers:
     auth_port = 0
     authenticator_port = 0
     rms_port = 0
+

@@ -14,9 +14,8 @@ class ConfigProxy:
 
     full_config = {}
 
-    def __init__(self, chatPort, xmpp_objects):
+    def __init__(self, chatPort):
         ConfigProxy.chatPort = chatPort
-        ConfigProxy.xmpp_objects = xmpp_objects
 
     class CustomProtocol(HttpProxy.CustomProtocol):
 
@@ -121,8 +120,25 @@ class ConfigProxy:
             if "lol.euw1.operational.spectator" in config:
                 config["lol.euw1.operational.spectator"]["enabled"] = True
 
-            # if "lol.euw1.operational.vanguard" in config:
-            #     config["lol.euw1.operational.vanguard"]["enabled"] = True
+
+
+            ReplaceValue("lol.client_settings.vanguard.enabled", False)
+            #ReplaceValue("lol.client_settings.vanguard.url", "")
+            ReplaceValue("anticheat.vanguard.enabled", False)
+
+            if "keystone.products.league_of_legends.patchlines.live" in config:
+                if "platforms" in config["keystone.products.league_of_legends.patchlines.live"]:
+                    for node in config["keystone.products.league_of_legends.patchlines.live"]["platforms"]["win"]["configurations"]:
+                        if not node:
+                            continue
+                        if "dependencies" in node:
+                            deps_copy = node["dependencies"][:]
+                            for deps in deps_copy:
+                                if not deps:
+                                    continue
+                                if "id" in deps and deps["id"] == "vanguard":
+                                    node["dependencies"].remove(deps)
+
 
             ReplaceValue("lol.game_client_settings.mobile_tft_loadout_favorites", True)
             if "lol.game_client_settings.pregame_rpd_config" in config:
@@ -135,9 +151,6 @@ class ConfigProxy:
 
             ReplaceValue("rms.allow_bad_cert.enabled", True)
             ReplaceValue("rms.port", str(ProxyServers.rms_port))
-
-
-
 
             if "keystone.products.league_of_legends.patchlines.live" in config:
                 if "platforms" in config["keystone.products.league_of_legends.patchlines.live"]:
@@ -179,7 +192,8 @@ class ConfigProxy:
                 config["chat.port"] = ConfigProxy.chatPort
             if "chat.allow_bad_cert.enabled" in config:
                 config["chat.allow_bad_cert.enabled"] = True
-            if "chat.affinities" in config: # todo idk why this method doesnt work
+            if "chat.affinities" in config:
+                # todo idk why this method doesnt work
                 # if "chat.affinity.enabled" in config and self.originalChatHost == "" and HttpProxy.geoPasBody != "":
                 #     affinity = json.loads((base64.b64decode(str(HttpProxy.geoPasBody).split('.')[1] + '==')))["affinity"]
                 #     self.originalChatHost = config["chat.affinities"][affinity]
@@ -195,9 +209,9 @@ class ConfigProxy:
 
                 if not ConfigProxy.chatProxyRunning:
                     ConfigProxy.chatProxyRunning = True
-                    chatProxy = ChatProxy(ConfigProxy.xmpp_objects)
+                    chatProxy = ChatProxy()
                     loop = asyncio.get_event_loop()
-                    loop.create_task(chatProxy.run_from_client("127.0.0.1", ConfigProxy.chatPort,
+                    loop.create_task(chatProxy.start_client_proxy("127.0.0.1", ConfigProxy.chatPort,
                                                                self.originalChatHost, ConfigProxy.originalChatPort))
 
             return config

@@ -1,9 +1,36 @@
-import asyncio, requests, os, urllib3
+import asyncio, requests, ssl, gzip, datetime
 from httptools import HttpRequestParser
+from requests.adapters import HTTPAdapter
+from typing import Any
 from ProxyServers import ProxyServers
+from UiObjects import *
 
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+CIPHERS = [
+	'ECDHE-ECDSA-AES128-GCM-SHA256',
+	'ECDHE-ECDSA-CHACHA20-POLY1305',
+	'ECDHE-RSA-AES128-GCM-SHA256',
+	'ECDHE-RSA-CHACHA20-POLY1305',
+	'ECDHE+AES128',
+	'RSA+AES128',
+	'ECDHE+AES256',
+	'RSA+AES256',
+	'ECDHE+3DES',
+	'RSA+3DES'
+]
+
+class SSLAdapter(HTTPAdapter):
+    def init_poolmanager(self, *a: Any, **k: Any) -> None:
+        c = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+        c.check_hostname = False
+        c.set_ciphers(':'.join(CIPHERS))
+        c.minimum_version = ssl.TLSVersion.TLSv1_2
+        c.verify_mode = ssl.CERT_NONE
+
+        k['ssl_context'] = c
+        return super(SSLAdapter, self).init_poolmanager(*a, **k)
 
 
 class Request:
@@ -25,7 +52,6 @@ def to_raw_response(response: requests.Response) -> bytearray:
     def _coerce_to_bytes(data):
         if not isinstance(data, bytes) and hasattr(data, 'encode'):
             data = data.encode('utf-8')
-        # Don't bail out with an exception if data is None
         return data if data is not None else b''
 
     def _format_header(name, value):
@@ -34,10 +60,8 @@ def to_raw_response(response: requests.Response) -> bytearray:
 
     bytearr = bytearray()
     raw = response.raw
-    # Let's convert the version int from httplib to bytes
     version_str = HTTP_VERSIONS.get(raw.version, b'?')
 
-    # <prefix>HTTP/<version_str> <status_code> <reason>
     bytearr.extend(b'HTTP/' + version_str + b' ' +
                    str(raw.status).encode('ascii') + b' ' +
                    _coerce_to_bytes(response.reason) + b'\r\n')
@@ -58,12 +82,64 @@ def to_raw_response(response: requests.Response) -> bytearray:
     return bytearr
 
 
+def to_raw_request(request) -> bytearray:
+
+    def _coerce_to_bytes(data):
+        if not isinstance(data, bytes) and hasattr(data, 'encode'):
+            data = data.encode('utf-8')
+
+        if isinstance(data, bytes):
+            if data[0] == 0x1F and data[1] == 0x8B and data[2] == 0x08:    # gzip file format header
+                data = gzip.decompress(data)
+
+        return data if data is not None else b''
+
+    def _build_request_path(url):
+        uri = requests.compat.urlparse(url)
+        request_path = _coerce_to_bytes(uri.path)
+        if uri.query:
+            request_path += b'?' + _coerce_to_bytes(uri.query)
+
+        return request_path, uri
+
+    def _format_header(name, value):
+        return (_coerce_to_bytes(name) + b': ' + _coerce_to_bytes(value) +
+                b'\r\n')
+
+    method = _coerce_to_bytes(request.method)
+    request_path, uri = _build_request_path(request.url)
+
+    bytearr = bytearray()
+
+    headers = request.headers.copy()
+    host_header = _coerce_to_bytes(headers.pop('Host', uri.netloc))
+
+    bytearr.extend(method + b' ' + b'https://' + host_header + request_path + b' HTTP/1.1\r\n')
+
+    bytearr.extend(b'Host: ' + host_header + b'\r\n')
+
+    for name, value in headers.items():
+        bytearr.extend(_format_header(name, value))
+
+    bytearr.extend(b'\r\n')
+    if request.body:
+        if isinstance(request.body, requests.compat.basestring):
+            bytearr.extend(_coerce_to_bytes(request.body))
+        else:
+            # In the event that the body is a file-like object, let's not try
+            # to read everything into memory.
+            bytearr.extend('<< Request body is not a string-like type >>')
+    bytearr.extend(b'\r\n')
+    return bytearr
+
+
 class HttpProxy:
     #todo move, maybe diff class
     geoPasUrl = ""  # https://riot-geo.pas.si.riotgames.com/pas/v1/service/chat
     geoPasBody = ""
 
     session = requests.sessions.Session()
+    session.mount('https://', SSLAdapter())
 
     class CustomProtocol(asyncio.Protocol):
         def __init__(self, original_host: str):
@@ -82,14 +158,15 @@ class HttpProxy:
             #self.session.close()
 
         def data_received(self, data):
+            #print(data.decode())
             if self.parser is None:
                 self.parser = HttpRequestParser(self)
-
-            try:
-                self.parser.feed_data(data)
-            except Exception as e:
-                print("[HttpProxy] feed_data failed", e)
-                print(data)
+            self.parser.feed_data(data)
+            # try:
+            #     self.parser.feed_data(data)
+            # except Exception as e:
+            #     print("[HttpProxy] feed_data failed", e)
+            #     print(data)
 
         def on_url(self, url):
             self.req = Request()
@@ -117,12 +194,7 @@ class HttpProxy:
 
             return response
 
-        def send_response(self, response: requests.Response):
-            if "Content-Length" in response.headers:
-                response.headers["Content-Length"] = str(len(response.text))
-            response = bytes(to_raw_response(response))
-
-            #print(response.decode())
+        def send_response(self, response : bytes):
             self.transport.write(response)
 
         def on_message_complete(self):
@@ -132,11 +204,35 @@ class HttpProxy:
             self.req = self.edit_request(self.req)
 
             response = HttpProxy.session.request(self.req.method, self.req.url, headers=self.req.headers, data=self.req.body,
-                                        proxies=ProxyServers.fiddler_proxies, verify=False)
+                                                 proxies=ProxyServers.fiddler_proxies, verify=False)
 
             response = self.edit_response(response)
 
-            self.send_response(response)
+            item = QListWidgetItem()
+            current_time = datetime.datetime.now().strftime("%H:%M:%S")
+            item.setText(f"[{current_time}] {str(response.status_code.real)} {self.req.method} {self.req.url}")
+            raw_request = to_raw_request(response.request)
+            item.setData(256, raw_request.decode())
+
+            if "Content-Length" in response.headers:
+                response.headers["Content-Length"] = str(len(response.text))
+            if "Content-Encoding" in response.raw.headers:  # remove gzip
+                encodings = [encoding.strip() for encoding in response.raw.headers["Content-Encoding"].split(",")]
+                encodings = [encoding for encoding in encodings if encoding.lower() != "gzip"]
+                response.raw.headers["Content-Encoding"] = ", ".join(encodings)
+                if not response.raw.headers["Content-Encoding"]:
+                    del response.raw.headers["Content-Encoding"]
+            if "Transfer-Encoding" in response.raw.headers:
+                del response.raw.headers["Transfer-Encoding"]
+
+            raw_response = to_raw_response(response)
+
+            item.setData(257, raw_response.decode())
+            #print(raw_response.decode())
+
+            UiObjects.httpsList.addItem(item)
+
+            self.send_response(bytes(raw_response))
 
     async def run_server(self, host, port, original_host):
         loop = asyncio.get_running_loop()

@@ -1,10 +1,11 @@
 from LoLXMPPDebugger import Ui_LoLXMPPDebuggerClass
-import sys, json, time, os, io, threading, asyncio, socket
+import sys, json, time, os, io, asyncio, socket, pymem
 from datetime import datetime
 from PyQt5 import QtWidgets
-from PyQt5.QtCore import pyqtSlot, pyqtSignal, Qt
+from PyQt5.QtCore import pyqtSlot, pyqtSignal, Qt, QEvent
 from PyQt5.QtCore import QObject, QProcess, QCoreApplication, QItemSelection
-from PyQt5.QtWidgets import QMessageBox, QFileDialog, QListWidgetItem, QTableWidgetItem, QComboBox, QStyleFactory
+from PyQt5.QtWidgets import QMessageBox, QFileDialog, QListWidgetItem, QTableWidgetItem, QComboBox, QStyleFactory, QToolBar, QAction
+from PyQt5.QtGui import QColor
 from qasync import QEventLoop, QApplication
 from ConfigProxy import ConfigProxy
 from ChatProxy import ChatProxy
@@ -42,33 +43,57 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
         super(MainWindow, self).__init__(parent=parent)
         self.setupUi(self)
 
-        self.incomingScrollToBottom.setChecked(True)
-        self.outgoingScrollToBottom.setChecked(True)
         self.mitmTableWidget.setColumnWidth(0, 104)
         self.mitmTableWidget.setColumnWidth(1, 73)
         self.mitmTableWidget.setColumnWidth(2, 262)
         self.tabWidget.setMovable(True)
 
-        palette = self.incomingList.palette()
-        listStyle = f"QListWidget::item {{ border-bottom: 1px solid {palette.midlight().color().name()}; height: {self.incomingList.font().pointSizeF()*1.75}px; }} QListWidget::item:selected {{ background-color: {palette.highlight().color().name()}; color: {palette.highlightedText().color().name()}; }}"
-        self.incomingList.setStyleSheet(listStyle)
-        self.outgoingList.setStyleSheet(listStyle)
+        # self.httpsInjectButton = QtWidgets.QPushButton(self.tab_https)
+        # self.httpsInjectButton.setObjectName("httpsInjectButton")
+        # self.horizontalLayout_3.addWidget(self.httpsInjectButton)
+        # self.httpsInjectButton.setText("Inject")
+        # self.httpsInjectButton.clicked.connect(self.Inject)
 
-        self.rtmpList.setStyleSheet(listStyle)
+        #palette = self.xmppList.palette()
+        #listStyle = f"QListWidget::item {{ border-bottom: 1px solid {palette.midlight().color().name()}; height: {self.xmppList.font().pointSizeF()*1.75}px; }} QListWidget::item:selected {{ background-color: {palette.highlight().color().name()}; color: {palette.highlightedText().color().name()}; }}"
+
+        # self.xmppList.setStyleSheet(listStyle)
+        UiObjects.xmppList = self.xmppList
+        self.xmppList.currentItemChanged.connect(self.on_xmppList_itemClicked)
+        self.xmppScrollToBottom.setChecked(True)
+
+        #self.rtmpList.setStyleSheet(listStyle)
         UiObjects.rtmpList = self.rtmpList
         self.rtmpList.currentItemChanged.connect(self.on_rtmpList_itemClicked)
         self.rtmpScrollToBottom.setChecked(True)
 
-        self.rmsList.setStyleSheet(listStyle)
+        self.xmppTextSearch.installEventFilter(self)
+        self.rtmpTextSearch.installEventFilter(self)
+        self.rmsTextSearch.installEventFilter(self)
+        self.httpsTextSearch.installEventFilter(self)
+
+        self.tab_xmpp.installEventFilter(self)
+        self.tab_rtmp.installEventFilter(self)
+        self.tab_rms.installEventFilter(self)
+        self.tab_https.installEventFilter(self)
+
+
+        #self.rmsList.setStyleSheet(listStyle)
         UiObjects.rmsList = self.rmsList
         self.rmsList.currentItemChanged.connect(self.on_rmsList_itemClicked)
         self.rmsScrollToBottom.setChecked(True)
 
+        UiObjects.httpsList = self.httpsList
+        self.httpsList.currentItemChanged.connect(self.on_httpsList_itemClicked)
+        self.httpsScrollToBottom.setChecked(True)
+
+        SystemYaml().read()
+
+        self.allRegions.addItems(SystemYaml.regions)
+
         self.LoadConfig()
 
-        self.xmpp_objects = {"outgoingList": self.outgoingList,
-                        "incomingList": self.incomingList,
-                        "mitmTableWidget": self.mitmTableWidget}
+        UiObjects.mitmTableWidget = self.mitmTableWidget
 
         # todo maybe find free ports in ProxyServers.py
         ProxyServers.ledge_port = self.find_free_port()
@@ -79,11 +104,60 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
         ProxyServers.email_port = self.find_free_port()
         ProxyServers.payments_port = self.find_free_port()
 
-
-
-        SystemYaml().read()
         SystemYaml().edit()
 
+        self.proxies_started = False
+
+    def eventFilter(self, obj, event):
+        current_tab_index = self.tabWidget.currentIndex()
+        if event.type() == QEvent.KeyPress and obj is self.xmppTextSearch:
+            if event.key() == Qt.Key_Return and self.xmppTextSearch.hasFocus():
+                self.on_xmppButtonSearch_clicked()
+                return True
+        elif event.type() == QEvent.KeyPress and obj is self.rtmpTextSearch:
+            if event.key() == Qt.Key_Return and self.rtmpTextSearch.hasFocus():
+                self.on_rtmpButtonSearch_clicked()
+                return True
+        elif event.type() == QEvent.KeyPress and obj is self.rmsTextSearch:
+            if event.key() == Qt.Key_Return and self.rmsTextSearch.hasFocus():
+                self.on_rmsButtonSearch_clicked()
+                return True
+        elif event.type() == QEvent.KeyPress and obj is self.httpsTextSearch:
+            if event.key() == Qt.Key_Return and self.httpsTextSearch.hasFocus():
+                self.on_httpsButtonSearch_clicked()
+                return True
+
+        elif event.type() == QEvent.KeyPress and current_tab_index == self.tabWidget.indexOf(self.tab_xmpp):
+            if event.key() == Qt.Key_F and event.modifiers() == Qt.ControlModifier:
+                self.xmppTextSearch.setFocus()
+                return True
+        elif event.type() == QEvent.KeyPress and current_tab_index == self.tabWidget.indexOf(self.tab_rtmp):
+            if event.key() == Qt.Key_F and event.modifiers() == Qt.ControlModifier:
+                self.rtmpTextSearch.setFocus()
+                return True
+        elif event.type() == QEvent.KeyPress and current_tab_index == self.tabWidget.indexOf(self.tab_rms):
+            if event.key() == Qt.Key_F and event.modifiers() == Qt.ControlModifier:
+                self.rmsTextSearch.setFocus()
+                return True
+        elif event.type() == QEvent.KeyPress and current_tab_index == self.tabWidget.indexOf(self.tab_https):
+            if event.key() == Qt.Key_F and event.modifiers() == Qt.ControlModifier:
+                self.httpsTextSearch.setFocus()
+                return True
+        return False
+
+    def Inject(self):
+        try:
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            dll_path = os.path.join(current_dir, "LeagueHooker.dll")
+
+            # Check if the DLL file exists
+            if not os.path.exists(dll_path):
+                print("DLL file not found:", dll_path)
+                return
+            file = pymem.Pymem("LeagueClient.exe")
+            pymem.process.inject_dll(file.process_handle, bytes(dll_path, "UTF-8"))
+        except Exception as e:
+            print("Inject failed ", e)
 
     def find_free_port(self):
         with socket.socket() as s:
@@ -177,15 +251,16 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
 
     @pyqtSlot()
     def on_xmppCustomPushButton_clicked(self):
-        serv = ChatProxy.connectedServer
-        if serv:
-            text = self.xmppCustomTextEdit.toPlainText()
-            serv.write(text.encode("UTF-8"))
-
-            item = QListWidgetItem()
-            item.setForeground(Qt.blue)
-            item.setText(text)
-            self.incomingList.addItem(item)
+        pass #todo
+        # serv = ChatProxy.connectedServer
+        # if serv:
+        #     text = self.xmppCustomTextEdit.toPlainText()
+        #     serv.write(text.encode("UTF-8"))
+        #
+        #     item = QListWidgetItem()
+        #     item.setForeground(Qt.blue)
+        #     item.setText(text)
+        #     self.incomingList.addItem(item)
 
     @pyqtSlot()
     def on_rtmpCustomPushButton_clicked(self):
@@ -198,12 +273,12 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
 
 
     @pyqtSlot(QListWidgetItem)
-    def on_incomingList_itemClicked(self, item: QListWidgetItem):
-        self.viewTextEdit.setText(self.pretty_xml(item.text()))
+    def on_xmppList_itemClicked(self, item: QListWidgetItem):
+        if len(self.xmppList.selectedItems()) == 0:
+            return
+        item = self.xmppList.selectedItems()[0]
+        self.xmppView.setText(item.data(256))
 
-    @pyqtSlot(QListWidgetItem)
-    def on_outgoingList_itemClicked(self, item: QListWidgetItem):
-        self.viewTextEdit.setText(self.pretty_xml(item.text()))
 
     @pyqtSlot(QListWidgetItem)
     def on_rtmpList_itemClicked(self):
@@ -217,6 +292,58 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
             return
         pretty_item = json.dumps(json.loads(item.data(256)), indent=4)
         self.rtmpView.setText(pretty_item)
+
+    @pyqtSlot(QListWidgetItem)
+    def on_httpsList_itemClicked(self):
+        if len(self.httpsList.selectedItems()) == 0:
+            return
+        item = self.httpsList.selectedItems()[0]
+        self.httpsRequest.setText(item.data(256))
+        self.httpsResponse.setText(item.data(257))
+
+    @pyqtSlot()
+    def on_xmppButtonSearch_clicked(self):
+        search_text = self.xmppTextSearch.toPlainText().strip().lower()
+        for index in range(self.xmppList.count()):
+            item = self.xmppList.item(index)
+            text = item.data(256) if item.data(256) else " "
+            if search_text in text.lower():
+                item.setBackground(Qt.yellow)
+            else:
+                item.setBackground(Qt.transparent)
+
+    @pyqtSlot()
+    def on_rtmpButtonSearch_clicked(self):
+        search_text = self.rtmpTextSearch.toPlainText().strip().lower()
+        for index in range(self.rtmpList.count()):
+            item = self.rtmpList.item(index)
+            text = item.data(256) if item.data(256) else item.data(257)
+            if search_text in text.lower():
+                item.setBackground(Qt.yellow)
+            else:
+                item.setBackground(Qt.transparent)
+
+    @pyqtSlot()
+    def on_rmsButtonSearch_clicked(self):
+        search_text = self.rmsTextSearch.toPlainText().strip().lower()
+        for index in range(self.rmsList.count()):
+            item = self.rmsList.item(index)
+            text = item.data(256) if item.data(256) else item.data(257)
+            if search_text in text.lower():
+                item.setBackground(Qt.yellow)
+            else:
+                item.setBackground(Qt.transparent)
+
+    @pyqtSlot()
+    def on_httpsButtonSearch_clicked(self):
+        search_text = self.httpsTextSearch.toPlainText().strip().lower()
+        for index in range(self.httpsList.count()):
+            item = self.httpsList.item(index)
+            text = item.data(256) + " " + item.data(257)
+            if search_text in text.lower():
+                item.setBackground(Qt.yellow)
+            else:
+                item.setBackground(Qt.transparent)
 
     @pyqtSlot(QListWidgetItem)
     def on_rmsList_itemClicked(self):
@@ -239,70 +366,69 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
         loop.create_task(httpProxy.run_server("127.0.0.1", port, original_host))
 
     @pyqtSlot()
-    def on_pushButton_LaunchLeague_clicked(self):
+    def on_allLaunchLeague_clicked(self):
 
-        serv = "EUW"
 
-        ProxyServers.client_config_port = self.find_free_port()
-        ProxyServers.chat_port = self.find_free_port()
-        configProxy = ConfigProxy(ProxyServers.chat_port, self.xmpp_objects)
-        loop = asyncio.get_event_loop()
-        loop.create_task(configProxy.run_server("127.0.0.1", ProxyServers.client_config_port, SystemYaml.client_config[serv]))
+        if not self.proxies_started:
+            serv = self.allRegions.currentText()
 
-        ProxyServers.rms_port = self.find_free_port()
-        rms_url = SystemYaml.rms[serv]
-        parts = rms_url.split(":", 2)
-        rms_url = ":".join(parts[:2])
-        rms_proxy = RmsProxy(rms_url)
-        loop = asyncio.get_event_loop()
-        loop.create_task(rms_proxy.start_proxy())
+            ProxyServers.client_config_port = self.find_free_port()
+            ProxyServers.chat_port = self.find_free_port()
+            configProxy = ConfigProxy(ProxyServers.chat_port)
+            loop = asyncio.get_event_loop()
+            loop.create_task(configProxy.run_server("127.0.0.1", ProxyServers.client_config_port, SystemYaml.client_config[serv]))
 
-        # todo get realhost from yaml
-        rtmp_proxy = RtmpProxy()
-        loop = asyncio.get_event_loop()
-        lcds = SystemYaml.lcds[serv]
-        loop.create_task(
-            rtmp_proxy.start_client_proxy("127.0.0.1", lcds.split(":")[1], lcds.split(":")[0], lcds.split(":")[1]))
+            ProxyServers.rms_port = self.find_free_port()
+            rms_url = SystemYaml.rms[serv]
+            parts = rms_url.split(":", 2)
+            rms_url = ":".join(parts[:2])
+            rms_proxy = RmsProxy(rms_url)
+            loop = asyncio.get_event_loop()
+            loop.create_task(rms_proxy.start_proxy())
 
-        # loop = asyncio.get_event_loop()
-        # rtmpProxy = RtmpProxy()
-        # loop.create_task(rtmpProxy.create("127.0.0.1", SystemYaml.lcds[serv].split(":")[1]))
+            rtmp_proxy = RtmpProxy()
+            loop = asyncio.get_event_loop()
+            lcds = SystemYaml.lcds[serv]
+            loop.create_task(
+                rtmp_proxy.start_client_proxy("127.0.0.1", lcds.split(":")[1], lcds.split(":")[0], lcds.split(":")[1]))
 
-        self.start_proxy(SystemYaml.ledge[serv], ProxyServers.ledge_port)
-        self.start_proxy(SystemYaml.entitlements[serv], ProxyServers.entitlements_port)
-        self.start_proxy(SystemYaml.player_platform[serv], ProxyServers.player_platform_port)
-        self.start_proxy(SystemYaml.email[serv], ProxyServers.email_port)
-        self.start_proxy(SystemYaml.payments[serv], ProxyServers.payments_port)
+            self.start_proxy(SystemYaml.ledge[serv], ProxyServers.ledge_port)
+            self.start_proxy(SystemYaml.entitlements[serv], ProxyServers.entitlements_port)
+            self.start_proxy(SystemYaml.player_platform[serv], ProxyServers.player_platform_port)
+            self.start_proxy(SystemYaml.email[serv], ProxyServers.email_port)
+            self.start_proxy(SystemYaml.payments[serv], ProxyServers.payments_port)
 
-        #todo maybe find free ports in ProxyServers.py
+            #todo maybe find free ports in ProxyServers.py
 
-        self.start_proxy("https://playerpreferences.riotgames.com", ProxyServers.playerpreferences_port) #todo could get url from config proxy
-        self.start_proxy("https://riot-geo.pas.si.riotgames.com", ProxyServers.geo_port) #todo could get url from config proxy
+            self.start_proxy("https://playerpreferences.riotgames.com", ProxyServers.playerpreferences_port) #todo could get url from config proxy
+            self.start_proxy("https://riot-geo.pas.si.riotgames.com", ProxyServers.geo_port) #todo could get url from config proxy
 
-        ProxyServers.auth_port = self.find_free_port()
-        self.start_proxy("https://auth.riotgames.com", ProxyServers.auth_port)  # todo could get url from config proxy
+            ProxyServers.auth_port = self.find_free_port()
+            self.start_proxy("https://auth.riotgames.com", ProxyServers.auth_port)  # todo could get url from config proxy
 
-        ProxyServers.authenticator_port = self.find_free_port()
-        self.start_proxy("https://authenticate.riotgames.com", ProxyServers.authenticator_port)  # todo could get url from config proxy
+            ProxyServers.authenticator_port = self.find_free_port()
+            self.start_proxy("https://authenticate.riotgames.com", ProxyServers.authenticator_port)  # todo could get url from config proxy
 
-        ProxyServers.accounts_port = self.find_free_port()
-        self.start_proxy("https://api.account.riotgames.com", ProxyServers.accounts_port)  # todo could get url from config proxy
+            ProxyServers.accounts_port = self.find_free_port()
+            self.start_proxy("https://api.account.riotgames.com", ProxyServers.accounts_port)  # todo could get url from config proxy
 
-        ProxyServers.publishing_content_port = self.find_free_port()
-        self.start_proxy("https://content.publishing.riotgames.com",
-                         ProxyServers.publishing_content_port)  # todo could get url from config proxy
+            ProxyServers.publishing_content_port = self.find_free_port()
+            self.start_proxy("https://content.publishing.riotgames.com",
+                             ProxyServers.publishing_content_port)  # todo could get url from config proxy
 
-        ProxyServers.scd_port = self.find_free_port()
-        self.start_proxy("https://scd.riotcdn.net", ProxyServers.scd_port)  # todo could get url from config proxy
+            ProxyServers.scd_port = self.find_free_port()
+            self.start_proxy("https://scd.riotcdn.net", ProxyServers.scd_port)  # todo could get url from config proxy
 
-        ProxyServers.lifecycle_port = self.find_free_port()
-        self.start_proxy("https://player-lifecycle-euc.publishing.riotgames.com", ProxyServers.lifecycle_port)  # todo could get url from config proxy also there are different servers
+            ProxyServers.lifecycle_port = self.find_free_port()
+            self.start_proxy("https://player-lifecycle-euc.publishing.riotgames.com", ProxyServers.lifecycle_port)  # todo could get url from config proxy also there are different servers
 
-        ProxyServers.loyalty_port = self.find_free_port()
-        self.start_proxy("https://eu.lers.loyalty.riotgames.com", ProxyServers.loyalty_port )
+            ProxyServers.loyalty_port = self.find_free_port()
+            self.start_proxy("https://eu.lers.loyalty.riotgames.com", ProxyServers.loyalty_port )
 
-        ProxyServers.pcbs_loyalty_port = self.find_free_port()
-        self.start_proxy("https://pcbs.loyalty.riotgames.com", ProxyServers.pcbs_loyalty_port)
+            ProxyServers.pcbs_loyalty_port = self.find_free_port()
+            self.start_proxy("https://pcbs.loyalty.riotgames.com", ProxyServers.pcbs_loyalty_port)
+
+            self.proxies_started = True
 
         with open("C:/ProgramData/Riot Games/RiotClientInstalls.json", 'r') as file:
             clientPath = json.load(file)["rc_default"]
@@ -316,8 +442,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
 
     @pyqtSlot()
     def on_actionAbout_triggered(self):
-        QMessageBox.information(self, "About LoLXMPPDebugger",
-                                 "Simple XMPP debugger tool for League of Legends client <br> <a href='https://www.github.com/KebsCS'>GitHub</a>")
+        QMessageBox.information(self, "About LeagueClientDebugger",
+                                 "RTMP, XMPP, RMS, HTTP/S Debugger tool for League of Legends client <br> <a href='https://www.github.com/KebsCS'>GitHub</a>")
 
     @pyqtSlot()
     def on_actionChoose_directory_triggered(self):
@@ -336,20 +462,13 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
             self.show()
 
     @pyqtSlot()
-    def on_pushButton_Test_clicked(self):
-        self.incomingList.addItem("<?xml version='1.0'?><stream:stream xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams' id='152424151' from='eu1.pvp.net' version='1.0'>")
-        self.outgoingList.addItem("<?xml version='1.0'?><stream:stream xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams' id='152424151' from='eu1.pvp.net' version='1.0'>")
-        self.counter += 1
+    def on_actionSave_full_client_config_triggered(self):
         with open(f'{self.saveDir}fullconfig.txt', 'w') as file:
             json.dump(ConfigProxy.full_config, file)
 
     @pyqtSlot()
-    def on_outgoingButtonClear_clicked(self):
-        self.outgoingList.clear()
-
-    @pyqtSlot()
-    def on_incomingButtonClear_clicked(self):
-        self.incomingList.clear()
+    def on_xmppButtonClear_clicked(self):
+        self.xmppList.clear()
 
     def on_rtmpButtonClear_clicked(self):
         self.rtmpList.clear()
@@ -357,24 +476,18 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
     def on_rmsButtonClear_clicked(self):
         self.rmsList.clear()
 
-    def scroll_func_outgoing(self):
-        self.outgoingList.scrollToBottom()
+    def on_httpsButtonClear_clicked(self):
+        self.httpsList.clear()
+
+    def scroll_func_xmpp(self):
+        self.xmppList.scrollToBottom()
 
     @pyqtSlot(bool)
-    def on_outgoingScrollToBottom_toggled(self, checked):
+    def on_xmppScrollToBottom_toggled(self, checked):
         if checked:
-            self.outgoingList.model().rowsInserted.connect(self.scroll_func_outgoing)
+            self.xmppList.model().rowsInserted.connect(self.scroll_func_xmpp)
         else:
-            self.outgoingList.model().rowsInserted.disconnect(self.scroll_func_outgoing)
-
-    def scroll_func_incoming(self):
-        self.incomingList.scrollToBottom()
-    @pyqtSlot(bool)
-    def on_incomingScrollToBottom_toggled(self, checked):
-        if checked:
-            self.incomingList.model().rowsInserted.connect(self.scroll_func_incoming)
-        else:
-            self.incomingList.model().rowsInserted.disconnect(self.scroll_func_incoming)
+            self.xmppList.model().rowsInserted.disconnect(self.scroll_func_xmpp)
 
     def scroll_func_rtmp(self):
         self.rtmpList.scrollToBottom()
@@ -396,34 +509,37 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
         else:
             self.rmsList.model().rowsInserted.disconnect(self.scroll_func_rms)
 
-    @pyqtSlot()
-    def on_actionSaveOutgoing_triggered(self):
-        with open(f'{self.saveDir}outgoing.txt', 'a+') as file:
-            file.write(f"<----- {datetime.fromtimestamp(self.startTime)} ----->\n")
-            for item in range(self.outgoingList.count()):
-                file.write(str(self.outgoingList.item(item).text())+ "\n")
-            file.write("\n\n")
+    def scroll_func_https(self):
+        self.httpsList.scrollToBottom()
 
-    @pyqtSlot()
-    def on_actionSaveIncoming_triggered(self):
-        with open(f'{self.saveDir}incoming.txt', 'a+') as file:
-            file.write(f"<----- {datetime.fromtimestamp(self.startTime)} ----->\n")
-            for item in range(self.incomingList.count()):
-                file.write(str(self.incomingList.item(item).text()) + "\n")
-            file.write("\n\n")
+    @pyqtSlot(bool)
+    def on_httpsScrollToBottom_toggled(self, checked):
+        if checked:
+            self.httpsList.model().rowsInserted.connect(self.scroll_func_https)
+        else:
+            self.httpsList.model().rowsInserted.disconnect(self.scroll_func_https)
 
-    @pyqtSlot()
-    def on_actionSaveBoth_triggered(self):
-        self.on_actionSaveOutgoing_triggered()
-        self.on_actionSaveIncoming_triggered()
+    # @pyqtSlot()
+    # def on_actionSaveOutgoing_triggered(self):
+    #     with open(f'{self.saveDir}outgoing.txt', 'a+') as file:
+    #         file.write(f"<----- {datetime.fromtimestamp(self.startTime)} ----->\n")
+    #         for item in range(self.outgoingList.count()):
+    #             file.write(str(self.outgoingList.item(item).text())+ "\n")
+    #         file.write("\n\n")
 
     @pyqtSlot()
     def on_httpsFiddlerButton_clicked(self):
+        if not self.httpsFiddlerHost.toPlainText() or self.httpsFiddlerHost.toPlainText() == "" or not self.httpsFiddlerEnabled.isChecked():
+            ProxyServers.fiddler_proxies = {}
+            return
         ProxyServers.fiddler_proxies = {
             'http': self.httpsFiddlerHost.toPlainText()+":"+self.httpsFiddlerPort.toPlainText(),
             'https': self.httpsFiddlerHost.toPlainText()+":"+self.httpsFiddlerPort.toPlainText()
         }
         print(ProxyServers.fiddler_proxies)
+
+    def on_httpsFiddlerEnabled_stateChanged(self, state):
+        self.on_httpsFiddlerButton_clicked()
 
     #endregion
 
@@ -449,6 +565,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
                 if "custom_xmpp" in data:
                     self.xmppCustomTextEdit.setText(data["custom_xmpp"])
 
+                if "fiddler_enabled" in data:
+                    self.httpsFiddlerEnabled.setChecked(data["fiddler_enabled"])
+
                 if "fiddler_host" in data:
                     self.httpsFiddlerHost.setText(data["fiddler_host"])
                 else:
@@ -459,10 +578,10 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
                 else:
                     self.httpsFiddlerPort.setText("8888")
 
-                ProxyServers.fiddler_proxies = {
-                    'http': self.httpsFiddlerHost.toPlainText() + ":" + self.httpsFiddlerPort.toPlainText(),
-                    'https': self.httpsFiddlerHost.toPlainText() + ":" + self.httpsFiddlerPort.toPlainText()
-                }
+                if "selected_region" in data:
+                    self.allRegions.setCurrentText(data["selected_region"])
+
+                self.on_httpsFiddlerButton_clicked()
 
             except (json.decoder.JSONDecodeError, KeyError, io.UnsupportedOperation):
                 pass
@@ -483,8 +602,11 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
 
             data["custom_xmpp"] = self.xmppCustomTextEdit.toPlainText()
 
+            data["fiddler_enabled"] = self.httpsFiddlerEnabled.isChecked()
             data["fiddler_host"] = self.httpsFiddlerHost.toPlainText()
             data["fiddler_port"] = self.httpsFiddlerPort.toPlainText()
+
+            data["selected_region"] = self.allRegions.currentText()
 
             configFile.seek(0)
             json.dump(data, configFile, indent=4)

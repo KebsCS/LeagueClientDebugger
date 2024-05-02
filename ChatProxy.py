@@ -1,156 +1,150 @@
-import asyncio, ssl
-from PyQt5.QtWidgets import QListWidgetItem
-from PyQt5.QtCore import Qt
+import asyncio, ssl, re, datetime
+from UiObjects import *
 
-# Proxy server
-class ProtocolToServer(asyncio.Protocol):
 
-    def __init__(self, on_con_lost, client, firstReq):
+def log_and_edit_message(message, is_outgoing) -> str:
+    #print('[XMPP] ' + ('>' if is_outgoing else '<') + " " + message)
+
+    item = QListWidgetItem()
+
+    # MITM
+    mitmTableWidget = UiObjects.mitmTableWidget
+    for row in range(mitmTableWidget.rowCount()):
+        if mitmTableWidget.item(row, 2).checkState() != 2:
+            continue
+        resp_req = "Request" if is_outgoing else "Response"
+        if mitmTableWidget.cellWidget(row, 0).currentText() == resp_req:
+            if mitmTableWidget.cellWidget(row, 1).currentText() == "XMPP":
+                contains = mitmTableWidget.item(row, 2).text()
+                if contains in message and contains and contains != "":
+                    message = mitmTableWidget.item(row, 3).text()
+                    item.setForeground(Qt.magenta)
+
+    text = "[OUT] " if is_outgoing else "[IN]     "
+    current_time = datetime.datetime.now().strftime("%H:%M:%S")
+    text += f"[{current_time}] "
+
+    if message.startswith("<"):
+        regex = re.compile(r"^<\/?(.*?)\/?>", re.MULTILINE)
+        match = regex.search(message)
+        if match:
+            text += match.group(1)
+    elif message == " ":
+        text += "heartbeat"
+    else:
+        text += message
+
+    item.setText(text)
+    item.setData(256, message)
+    UiObjects.xmppList.addItem(item)
+    return message
+
+class ProtocolFromServer(asyncio.Protocol):
+
+    def __init__(self, on_con_lost, league_client, first_req):
         self.on_con_lost = on_con_lost
-        self.client = client
-        self.firstReq = firstReq
+
+        self.real_server = None
+        self.league_client = league_client
+        self.first_req = first_req
+
+        self.all_data = b''
 
     def connection_made(self, transport):
+        self.real_server = transport
         peername = transport.get_extra_info('peername')
-        # print(f'[ToServer] Connected {peername}')
-        self.transport = transport
-
-        item = QListWidgetItem()
-        item.setForeground(Qt.green)
-        item.setText("Connected")
-        ChatProxy.xmpp_objects["outgoingList"].addItem(item)
+        print(f'[XMPP] Client connected to real riot server {peername}')
 
         # connection is made after the first request was already sent
-        transport.write(self.firstReq)
+        self.real_server.write(self.first_req)
 
     def data_received(self, data):
-        received = data.decode("UTF-8")
-        # print(f'[ToServer] Received: received {received}')
-        item = QListWidgetItem()
+        self.all_data += data
+        if self.all_data and self.all_data != b" " and self.all_data[-1] != ord('>'):
+            return
+        message = self.all_data.decode("UTF-8")
+        self.all_data = b''
 
-        # MITM
-        mitmTableWidget = ChatProxy.xmpp_objects["mitmTableWidget"]
-        for row in range(mitmTableWidget.rowCount()):
-            if mitmTableWidget.item(row, 2).checkState() != 2:
-                continue
-            if mitmTableWidget.cellWidget(row, 0).currentText() == "Response":
-                if mitmTableWidget.cellWidget(row, 1).currentText() == "XMPP":
-                    contains = mitmTableWidget.item(row, 2).text()
-                    if contains in received and contains and contains != "":
-                        received = mitmTableWidget.item(row, 3).text()
-                        item.setForeground(Qt.magenta)
-
-        item.setText(received)
-        ChatProxy.xmpp_objects["outgoingList"].addItem(item)
-        self.client.write(received.encode("UTF-8"))
+        message = log_and_edit_message(message, False)
+        self.league_client.write(message.encode("UTF-8"))
 
     def connection_lost(self, exc):
-        # print('[ToServer] Connection lost', exc)
+        print('[XMPP] Connection lost with riot server', exc)
 
-        item = QListWidgetItem()
-        item.setForeground(Qt.red)
-        item.setText("Connection lost")
-        ChatProxy.xmpp_objects["outgoingList"].addItem(item)
+        UiObjects.add_disconnected_item(UiObjects.xmppList)
 
-        self.client.close()
+        self.league_client.close()
         self.on_con_lost.set_result(True)
 
 
 class ChatProxy:
-    xmpp_objects = None
-    connectedServer = None
-
-    def __init__(self, xmpp_objects):
-        ChatProxy.xmpp_objects = xmpp_objects
-
     # Incoming from client
     class ProtocolFromClient(asyncio.Protocol):
 
-        def __init__(self, realHost, realPort):
-            self.state = 0  # 0 - not connected to real server
-            self.realHost = realHost
-            self.realPort = realPort
+        def __init__(self, real_host, real_port):
+            self.is_connected = False
+
+            self.real_host = real_host  # euw1.chat.si.riotgames.com
+            self.real_port = real_port  # 5223
+
+            self.real_server = None
+            self.league_client = None
+
+            self.all_data = b''
 
         def connection_made(self, transport):
+            self.league_client = transport
             peername = transport.get_extra_info('peername')
-            # print(f'[FromClient] Connection from {peername}')
-            self.fromClient = transport
+            print(f'[XMPP] League client connected to proxy {peername}')
 
-            item = QListWidgetItem()
-            item.setForeground(Qt.green)
-            item.setText("Connected")
-            ChatProxy.xmpp_objects["incomingList"].addItem(item)
-
+            UiObjects.add_connected_item(UiObjects.xmppList)
 
         def connection_lost(self, exc):
-            # print('[FromClient] Connection lost', exc)
+            print('[XMPP] Connection lost with league client', exc)
 
-            item = QListWidgetItem()
-            item.setForeground(Qt.red)
-            item.setText("Connection lost")
-            ChatProxy.xmpp_objects["incomingList"].addItem(item)
-
-            if self.state == 1:
-                self.realServer.close()
-                self.state = 0
+            if self.is_connected:
+                self.real_server.close()
+                self.is_connected = False
 
         def data_received(self, data):
-            received = data.decode("UTF-8")
-            # print(f'[FromClient] Data received: {received}')
-            item = QListWidgetItem()
+            self.all_data += data
+            if self.all_data and self.all_data != b" " and self.all_data[-1] != ord('>'):
+                return
+            message = self.all_data.decode("UTF-8")
+            self.all_data = b''
 
-            # MITM
-            mitmTableWidget = ChatProxy.xmpp_objects["mitmTableWidget"]
-            for row in range(mitmTableWidget.rowCount()):
-                if mitmTableWidget.item(row, 2).checkState() != 2:
-                    continue
-                if mitmTableWidget.cellWidget(row, 0).currentText() == "Request":
-                    if mitmTableWidget.cellWidget(row, 1).currentText() == "XMPP":
-                        contains = mitmTableWidget.item(row, 2).text()
-                        if contains in received and contains and contains != "":
-                            received = mitmTableWidget.item(row, 3).text()
-                            item.setForeground(Qt.magenta)
+            message = log_and_edit_message(message, True)
 
-            if self.state == 1:
-                self.realServer.write(received.encode("UTF-8"))
+            if self.is_connected:
+                self.real_server.write(message.encode("UTF-8"))
             else:
-                # connect to real server
                 asyncio.ensure_future(
-                    self.run_to_server(self.realHost, self.realPort, self.fromClient, received.encode("UTF-8")))
+                    self.connect_to_real_server(self.real_host, self.real_port, self.league_client, message.encode("UTF-8")))
 
-            item.setText(received)
-            ChatProxy.xmpp_objects["incomingList"].addItem(item)
-
-
-        async def run_to_server(self, host, port, client, firstReq):
+        async def connect_to_real_server(self, real_host, real_port, league_client, first_req):
             loop = asyncio.get_event_loop()
             on_con_lost = loop.create_future()
 
             transport, protocol = await loop.create_connection(
-                lambda: ProtocolToServer(on_con_lost, client, firstReq),
-                host, port, ssl=ssl.SSLContext(protocol=ssl.PROTOCOL_TLSv1_2))
+                lambda: ProtocolFromServer(on_con_lost, league_client, first_req),
+                real_host, real_port, ssl=ssl.SSLContext(protocol=ssl.PROTOCOL_TLSv1_2))
 
-            self.realServer = transport
-            ChatProxy.connectedServer = self.realServer
-            self.state = 1
+            self.real_server = transport
+            self.is_connected = True
 
             try:
                 await on_con_lost
             finally:
-                self.realServer.close()
+                self.real_server.close()
 
-
-    async def run_from_client(self, host, port, realHost, realPort):
+    async def start_client_proxy(self, proxy_host, proxy_port, real_host, real_port):
         loop = asyncio.get_running_loop()
 
-        #context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
-        #context.load_cert_chain(certfile="public.cer", keyfile="private.key")
         server = await loop.create_server(
-            lambda: self.ProtocolFromClient(realHost, realPort),
-            host, port)#, ssl=context)
+            lambda: self.ProtocolFromClient(real_host, real_port),
+            proxy_host, proxy_port)
 
-
-        print('[FromClient] Server started on ' + host + ':' + str(port))
+        print(f'[XMPP] Proxy server started on {proxy_host}:{proxy_port}')
 
         async with server:
             await server.serve_forever()
