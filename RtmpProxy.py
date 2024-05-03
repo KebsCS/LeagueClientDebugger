@@ -108,7 +108,7 @@ def log_message(parser, is_outgoing):
         UiObjects.rtmpList.addItem(item)
     else:
         item = QListWidgetItem()
-        item.setText(text)
+        item.setText(text + "handshake" if isinstance(parser.current_message, bytes) else "")
         item.setData(256, str(parser.current_message))
         UiObjects.rtmpList.addItem(item)
 

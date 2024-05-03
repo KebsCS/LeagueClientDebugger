@@ -1,4 +1,4 @@
-import socket, asyncio
+import socket
 
 
 def find_free_port():
@@ -15,7 +15,7 @@ class ProxyServers:
     accounts_port = 0
     publishing_content_port = 0
     scd_port = 0
-    sieve_port = 0 #"https://sieve.services.riotcdn.net", todo it has patch versions
+    sieve_port = 0
     lifecycle_port = 0
     loyalty_port = 0
     pcbs_loyalty_port = 0

@@ -4,27 +4,26 @@ from ProxyServers import ProxyServers
 from UiObjects import *
 
 class RmsProxy:
-    def __init__(self, real_host):
-        self.real_host = real_host
+    global_ws = None
+    global_target_ws = None
+    global_useragent = None
+
+    def __init__(self, real_host):  # wss://eu.edge.rms.si.riotgames.com:443
+        parts = real_host.split(":")
+        self.real_host = ":".join(parts[:2])    # wss://eu.edge.rms.si.riotgames.com
+        self.real_port = parts[-1]
 
     async def handle_connection(self, ws, path):
         target_hostname = self.real_host
 
         req_headers = dict(ws.request_headers)
-        #print(f"req_headers {req_headers}")
+
         if 'host' in req_headers:
-            del req_headers['host']
-        if 'upgrade' in req_headers:
-            del req_headers['upgrade']
-        if 'connection' in req_headers:
-            del req_headers['connection']
-        if 'sec-websocket-key' in req_headers:
-            del req_headers['sec-websocket-key']
+            req_headers['host'] = self.real_host.split("//")[-1] + ":" + self.real_port
         if 'origin' in req_headers:
             del req_headers['origin']
 
         ws.useragent = re.search(r"(?<=\) ).+/.", req_headers["user-agent"]).group()
-
         UiObjects.add_connected_item(UiObjects.rmsList, str(ws.useragent), json.dumps(req_headers, indent=4))
 
         ws.target_ws_buffer = []
@@ -32,7 +31,7 @@ class RmsProxy:
         async def process_ws_messages(ws, target_ws):
             try:
                 async for message in ws:
-                    await self.log_message(message, True, ws.useragent)
+                    await RmsProxy.log_message(message, True, ws.useragent)
                     if target_ws.open:
                         await target_ws.send(message)
                     else:
@@ -47,7 +46,7 @@ class RmsProxy:
                 ws.target_ws_buffer = []
             try:
                 async for message in target_ws:
-                    await self.log_message(message, False, ws.useragent)
+                    await RmsProxy.log_message(message, False, ws.useragent)
                     await ws.send(message)
             except websockets.ConnectionClosed as e:
                 print("[RMS] Connection closed ", e)
@@ -55,13 +54,16 @@ class RmsProxy:
 
 
         async with websockets.connect(target_hostname + path, extra_headers=req_headers) as target_ws:
-
+            RmsProxy.global_ws = ws
+            RmsProxy.global_target_ws = target_ws
+            RmsProxy.global_useragent = ws.useragent
             await asyncio.gather(
                 process_ws_messages(ws, target_ws),
                 process_target_ws_messages(ws, target_ws)
             )
 
-    async def log_message(self, message, is_outgoing, source):
+    @staticmethod
+    async def log_message(message, is_outgoing, source):
         display_message = message
 
         if isinstance(message, bytes):
@@ -84,4 +86,5 @@ class RmsProxy:
 
 
     async def start_proxy(self):
+        print(f'[RMS] Proxy server started on localhost:{ProxyServers.rms_port}')
         server = await websockets.serve(self.handle_connection, host="localhost", port=ProxyServers.rms_port)

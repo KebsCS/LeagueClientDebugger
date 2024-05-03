@@ -1,3 +1,6 @@
-outgoing.txt
-incoming.txt
+venv
+.idea
+__pycache__
 config.json
+fullconfig.txt
+all_requests.txt

@@ -208,12 +208,6 @@ class HttpProxy:
 
             response = self.edit_response(response)
 
-            item = QListWidgetItem()
-            current_time = datetime.datetime.now().strftime("%H:%M:%S")
-            item.setText(f"[{current_time}] {str(response.status_code.real)} {self.req.method} {self.req.url}")
-            raw_request = to_raw_request(response.request)
-            item.setData(256, raw_request.decode())
-
             if "Content-Length" in response.headers:
                 response.headers["Content-Length"] = str(len(response.text))
             if "Content-Encoding" in response.raw.headers:  # remove gzip
@@ -228,21 +222,33 @@ class HttpProxy:
                 del response.headers["Transfer-Encoding"]
 
             raw_response = to_raw_response(response)
-            raw_response_str = raw_response.decode()
 
-            try:
-                if "Content-Type" in response.headers and "json" in response.headers["Content-Type"] \
-                        and response.status_code.real != 204:
-                    raw_response_split = raw_response.decode().split("\r\n\r\n")
-                    raw_response_str = raw_response_split[0] + "\r\n\r\n" + json.dumps(json.loads(raw_response_split[1]), indent=4)
-                item.setData(257, raw_response_str)
-            except Exception as e:
-                print("json indent response failed")
-                print(raw_response_str)
-
-            UiObjects.httpsList.addItem(item)
-
+            HttpProxy.log_message(response, raw_response)
             self.send_response(bytes(raw_response))
+
+    @staticmethod
+    def log_message(response: requests.Response, raw_response=None):
+        if raw_response is None:
+            raw_response = to_raw_response(response)
+        item = QListWidgetItem()
+        current_time = datetime.datetime.now().strftime("%H:%M:%S")
+        item.setText(
+            f"[{current_time}] {str(response.status_code.real)} {response.request.method} {response.request.url}")
+        raw_request = to_raw_request(response.request)
+        item.setData(256, raw_request.decode())
+
+        raw_response_str = raw_response.decode()
+        try:
+            if "Content-Type" in response.headers and "json" in response.headers["Content-Type"] \
+                    and response.status_code.real != 204:
+                raw_response_split = raw_response_str.split("\r\n\r\n")
+                raw_response_str = raw_response_split[0] + "\r\n\r\n" + json.dumps(json.loads(raw_response_split[1]), indent=4)
+            item.setData(257, raw_response_str)
+        except Exception as e:
+            print("json indent response failed")
+            print(raw_response_str)
+
+        UiObjects.httpsList.addItem(item)
 
     async def run_server(self, host, port, original_host):
         loop = asyncio.get_running_loop()

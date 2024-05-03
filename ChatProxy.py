@@ -3,52 +3,6 @@ from lxml import etree
 
 from UiObjects import *
 
-
-def log_and_edit_message(message, is_outgoing) -> str:
-    #print('[XMPP] ' + ('>' if is_outgoing else '<') + " " + message)
-
-    item = QListWidgetItem()
-
-    # MITM
-    mitmTableWidget = UiObjects.mitmTableWidget
-    for row in range(mitmTableWidget.rowCount()):
-        if mitmTableWidget.item(row, 2).checkState() != 2:
-            continue
-        resp_req = "Request" if is_outgoing else "Response"
-        if mitmTableWidget.cellWidget(row, 0).currentText() == resp_req:
-            if mitmTableWidget.cellWidget(row, 1).currentText() == "XMPP":
-                contains = mitmTableWidget.item(row, 2).text()
-                if contains in message and contains and contains != "":
-                    message = mitmTableWidget.item(row, 3).text()
-                    item.setForeground(Qt.magenta)
-
-    current_time = datetime.datetime.now().strftime("%H:%M:%S")
-    text = f"[{current_time}] "
-    text += "[OUT] " if is_outgoing else "[IN]     "
-
-    if message.startswith("<"):
-        regex = re.compile(r"^<\/?(.*?)\/?>", re.MULTILINE)
-        match = regex.search(message)
-        if match:
-            text += match.group(1)
-    elif message == " ":
-        text += "heartbeat"
-    else:
-        text += message
-
-    item.setText(text)
-
-    def pretty_xml(xml_string):
-        try:
-            root = etree.fromstring(xml_string.encode("utf-8"))
-            return etree.tostring(root, pretty_print=True).decode()
-        except etree.XMLSyntaxError:
-            return xml_string
-
-    item.setData(256, pretty_xml(message))
-    UiObjects.xmppList.addItem(item)
-    return message
-
 class ProtocolFromServer(asyncio.Protocol):
 
     def __init__(self, on_con_lost, league_client, first_req):
@@ -75,7 +29,7 @@ class ProtocolFromServer(asyncio.Protocol):
         message = self.all_data.decode("UTF-8")
         self.all_data = b''
 
-        message = log_and_edit_message(message, False)
+        message = ChatProxy.log_and_edit_message(message, False)
         self.league_client.write(message.encode("UTF-8"))
 
     def connection_lost(self, exc):
@@ -88,6 +42,8 @@ class ProtocolFromServer(asyncio.Protocol):
 
 
 class ChatProxy:
+    global_league_client = None
+    global_real_server = None
     # Incoming from client
     class ProtocolFromClient(asyncio.Protocol):
 
@@ -104,6 +60,7 @@ class ChatProxy:
 
         def connection_made(self, transport):
             self.league_client = transport
+            ChatProxy.global_league_client = self.league_client
             peername = transport.get_extra_info('peername')
             print(f'[XMPP] League client connected to proxy {peername}')
 
@@ -123,7 +80,7 @@ class ChatProxy:
             message = self.all_data.decode("UTF-8")
             self.all_data = b''
 
-            message = log_and_edit_message(message, True)
+            message = ChatProxy.log_and_edit_message(message, True)
 
             if self.is_connected:
                 self.real_server.write(message.encode("UTF-8"))
@@ -140,12 +97,59 @@ class ChatProxy:
                 real_host, real_port, ssl=ssl.SSLContext(protocol=ssl.PROTOCOL_TLSv1_2))
 
             self.real_server = transport
+            ChatProxy.global_real_server = self.real_server
             self.is_connected = True
 
             try:
                 await on_con_lost
             finally:
                 self.real_server.close()
+
+    @staticmethod
+    def log_and_edit_message(message, is_outgoing) -> str:
+        # print('[XMPP] ' + ('>' if is_outgoing else '<') + " " + message)
+
+        item = QListWidgetItem()
+
+        # MITM
+        mitmTableWidget = UiObjects.mitmTableWidget
+        for row in range(mitmTableWidget.rowCount()):
+            if mitmTableWidget.item(row, 2).checkState() != 2:
+                continue
+            resp_req = "Request" if is_outgoing else "Response"
+            if mitmTableWidget.cellWidget(row, 0).currentText() == resp_req:
+                if mitmTableWidget.cellWidget(row, 1).currentText() == "XMPP":
+                    contains = mitmTableWidget.item(row, 2).text()
+                    if contains in message and contains and contains != "":
+                        message = mitmTableWidget.item(row, 3).text()
+                        item.setForeground(Qt.magenta)
+
+        current_time = datetime.datetime.now().strftime("%H:%M:%S")
+        text = f"[{current_time}] "
+        text += "[OUT] " if is_outgoing else "[IN]     "
+
+        if message.startswith("<"):
+            regex = re.compile(r"^<\/?(.*?)\/?>", re.MULTILINE)
+            match = regex.search(message)
+            if match:
+                text += match.group(1)
+        elif message == " ":
+            text += "heartbeat"
+        else:
+            text += message
+
+        item.setText(text)
+
+        def pretty_xml(xml_string):
+            try:
+                root = etree.fromstring(xml_string.encode("utf-8"))
+                return etree.tostring(root, pretty_print=True).decode()
+            except etree.XMLSyntaxError:
+                return xml_string
+
+        item.setData(256, pretty_xml(message))
+        UiObjects.xmppList.addItem(item)
+        return message
 
     async def start_client_proxy(self, proxy_host, proxy_port, real_host, real_port):
         loop = asyncio.get_running_loop()

@@ -2,6 +2,7 @@ import asyncio, requests, re, json, base64, os
 from ChatProxy import ChatProxy
 from HttpProxy import HttpProxy
 from ProxyServers import ProxyServers
+from UiObjects import *
 
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
@@ -39,6 +40,9 @@ class ConfigProxy:
 
             config = re.sub(r"https://\w+\.ledge\.leagueoflegends\.com",
                             f"http://localhost:{ProxyServers.ledge_port}", config)
+
+            config = config.replace("https://sieve.services.riotcdn.net",
+                                    f"http://localhost:{ProxyServers.sieve_port}")
 
             config = config.replace("https://scd.riotcdn.net",
                                     f"http://localhost:{ProxyServers.scd_port}")
@@ -115,29 +119,28 @@ class ConfigProxy:
 
             ReplaceValue("lol.client_settings.tft.tft_tastes_experiment_enabled", True)
             ReplaceValue("lol.client_settings.topNavUpdates.profileButtonMigration", True)
-            # ReplaceValue("lol.client_settings.vanguard.enabled", True)
 
             if "lol.euw1.operational.spectator" in config:
                 config["lol.euw1.operational.spectator"]["enabled"] = True
 
 
+            if UiObjects.optionsDisableVanguard.isChecked():
+                ReplaceValue("lol.client_settings.vanguard.enabled", False)
+                #ReplaceValue("lol.client_settings.vanguard.url", "")
+                ReplaceValue("anticheat.vanguard.enabled", False)
 
-            ReplaceValue("lol.client_settings.vanguard.enabled", False)
-            #ReplaceValue("lol.client_settings.vanguard.url", "")
-            ReplaceValue("anticheat.vanguard.enabled", False)
-
-            if "keystone.products.league_of_legends.patchlines.live" in config:
-                if "platforms" in config["keystone.products.league_of_legends.patchlines.live"]:
-                    for node in config["keystone.products.league_of_legends.patchlines.live"]["platforms"]["win"]["configurations"]:
-                        if not node:
-                            continue
-                        if "dependencies" in node:
-                            deps_copy = node["dependencies"][:]
-                            for deps in deps_copy:
-                                if not deps:
-                                    continue
-                                if "id" in deps and deps["id"] == "vanguard":
-                                    node["dependencies"].remove(deps)
+                if "keystone.products.league_of_legends.patchlines.live" in config:
+                    if "platforms" in config["keystone.products.league_of_legends.patchlines.live"]:
+                        for node in config["keystone.products.league_of_legends.patchlines.live"]["platforms"]["win"]["configurations"]:
+                            if not node:
+                                continue
+                            if "dependencies" in node:
+                                deps_copy = node["dependencies"][:]
+                                for deps in deps_copy:
+                                    if not deps:
+                                        continue
+                                    if "id" in deps and deps["id"] == "vanguard":
+                                        node["dependencies"].remove(deps)
 
 
             ReplaceValue("lol.game_client_settings.mobile_tft_loadout_favorites", True)

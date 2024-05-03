@@ -75,6 +75,4 @@ class SystemYaml:
         with open(self.path.replace('system.yaml', 'Config\\system.yaml'), 'w') as fp:
             yaml.YAML(typ='rt').dump(read_data, fp)
 
-    def get_variable(self, name):
-        return getattr(self, name)
 
