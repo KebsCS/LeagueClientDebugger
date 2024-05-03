@@ -224,11 +224,21 @@ class HttpProxy:
                     del response.raw.headers["Content-Encoding"]
             if "Transfer-Encoding" in response.raw.headers:
                 del response.raw.headers["Transfer-Encoding"]
+            if "Transfer-Encoding" in response.headers:
+                del response.headers["Transfer-Encoding"]
 
             raw_response = to_raw_response(response)
+            raw_response_str = raw_response.decode()
 
-            item.setData(257, raw_response.decode())
-            #print(raw_response.decode())
+            try:
+                if "Content-Type" in response.headers and "json" in response.headers["Content-Type"] \
+                        and response.status_code.real != 204:
+                    raw_response_split = raw_response.decode().split("\r\n\r\n")
+                    raw_response_str = raw_response_split[0] + "\r\n\r\n" + json.dumps(json.loads(raw_response_split[1]), indent=4)
+                item.setData(257, raw_response_str)
+            except Exception as e:
+                print("json indent response failed")
+                print(raw_response_str)
 
             UiObjects.httpsList.addItem(item)
 

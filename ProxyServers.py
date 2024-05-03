@@ -1,4 +1,15 @@
+import socket, asyncio
+
+
+def find_free_port():
+    with socket.socket() as s:
+        s.bind(('', 0))
+        return s.getsockname()[1]
+
+
 class ProxyServers:
+    fiddler_proxies = {}
+
     client_config_port = 0
     chat_port = 0
     accounts_port = 0
@@ -13,10 +24,15 @@ class ProxyServers:
     ledge_port = 0
     player_platform_port = 0
     payments_port = 0
-    fiddler_proxies = {}
     playerpreferences_port = 0
     geo_port = 0
     auth_port = 0
     authenticator_port = 0
     rms_port = 0
 
+
+    @staticmethod
+    def assign_ports():
+        for attr_name in dir(ProxyServers):
+            if attr_name.endswith("_port"):
+                setattr(ProxyServers, attr_name, find_free_port())

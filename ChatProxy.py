@@ -1,4 +1,6 @@
 import asyncio, ssl, re, datetime
+from lxml import etree
+
 from UiObjects import *
 
 
@@ -20,9 +22,9 @@ def log_and_edit_message(message, is_outgoing) -> str:
                     message = mitmTableWidget.item(row, 3).text()
                     item.setForeground(Qt.magenta)
 
-    text = "[OUT] " if is_outgoing else "[IN]     "
     current_time = datetime.datetime.now().strftime("%H:%M:%S")
-    text += f"[{current_time}] "
+    text = f"[{current_time}] "
+    text += "[OUT] " if is_outgoing else "[IN]     "
 
     if message.startswith("<"):
         regex = re.compile(r"^<\/?(.*?)\/?>", re.MULTILINE)
@@ -35,7 +37,15 @@ def log_and_edit_message(message, is_outgoing) -> str:
         text += message
 
     item.setText(text)
-    item.setData(256, message)
+
+    def pretty_xml(xml_string):
+        try:
+            root = etree.fromstring(xml_string.encode("utf-8"))
+            return etree.tostring(root, pretty_print=True).decode()
+        except etree.XMLSyntaxError:
+            return xml_string
+
+    item.setData(256, pretty_xml(message))
     UiObjects.xmppList.addItem(item)
     return message
 

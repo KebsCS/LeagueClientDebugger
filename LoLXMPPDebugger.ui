@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>919</width>
-    <height>519</height>
+    <width>1022</width>
+    <height>615</height>
    </rect>
   </property>
   <property name="minimumSize">
@@ -52,10 +52,25 @@
         <string>Start</string>
        </attribute>
        <layout class="QHBoxLayout" name="horizontalLayout_24">
+        <property name="leftMargin">
+         <number>0</number>
+        </property>
+        <property name="topMargin">
+         <number>3</number>
+        </property>
+        <property name="rightMargin">
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
         <item>
-         <widget class="QSplitter" name="splitter_5">
+         <widget class="QSplitter" name="allSplitter">
           <property name="orientation">
            <enum>Qt::Horizontal</enum>
+          </property>
+          <property name="opaqueResize">
+           <bool>true</bool>
           </property>
           <property name="handleWidth">
            <number>2</number>
@@ -65,6 +80,18 @@
           </property>
           <widget class="QWidget" name="verticalLayoutWidget_12">
            <layout class="QVBoxLayout" name="verticalLayout_15">
+            <property name="leftMargin">
+             <number>0</number>
+            </property>
+            <property name="topMargin">
+             <number>6</number>
+            </property>
+            <property name="rightMargin">
+             <number>0</number>
+            </property>
+            <property name="bottomMargin">
+             <number>3</number>
+            </property>
             <item>
              <layout class="QHBoxLayout" name="horizontalLayout_22">
               <item>
@@ -81,8 +108,14 @@
                   <height>20</height>
                  </size>
                 </property>
+                <property name="inputMethodHints">
+                 <set>Qt::ImhNone</set>
+                </property>
                 <property name="verticalScrollBarPolicy">
                  <enum>Qt::ScrollBarAlwaysOff</enum>
+                </property>
+                <property name="acceptRichText">
+                 <bool>false</bool>
                 </property>
                </widget>
               </item>
@@ -90,6 +123,9 @@
                <widget class="QPushButton" name="allButtonSearch">
                 <property name="text">
                  <string>Search</string>
+                </property>
+                <property name="flat">
+                 <bool>false</bool>
                 </property>
                </widget>
               </item>
@@ -100,6 +136,12 @@
             </item>
             <item>
              <layout class="QHBoxLayout" name="horizontalLayout_21">
+              <property name="topMargin">
+               <number>0</number>
+              </property>
+              <property name="bottomMargin">
+               <number>0</number>
+              </property>
               <item>
                <widget class="QPushButton" name="allButtonClear">
                 <property name="text">
@@ -133,6 +175,18 @@
           </widget>
           <widget class="QWidget" name="verticalLayoutWidget_11">
            <layout class="QVBoxLayout" name="verticalLayout_14">
+            <property name="leftMargin">
+             <number>0</number>
+            </property>
+            <property name="topMargin">
+             <number>6</number>
+            </property>
+            <property name="rightMargin">
+             <number>0</number>
+            </property>
+            <property name="bottomMargin">
+             <number>3</number>
+            </property>
             <item>
              <layout class="QHBoxLayout" name="horizontalLayout_23">
               <item>
@@ -186,7 +240,11 @@
              </layout>
             </item>
             <item>
-             <widget class="QTextEdit" name="allView"/>
+             <widget class="QTextEdit" name="allView">
+              <property name="lineWrapMode">
+               <enum>QTextEdit::NoWrap</enum>
+              </property>
+             </widget>
             </item>
            </layout>
           </widget>
@@ -198,6 +256,10 @@
        <property name="focusPolicy">
         <enum>Qt::NoFocus</enum>
        </property>
+       <attribute name="icon">
+        <iconset>
+         <normaloff>images/xmpp.png</normaloff>images/xmpp.png</iconset>
+       </attribute>
        <attribute name="title">
         <string>XMPP</string>
        </attribute>
@@ -215,7 +277,7 @@
          <number>0</number>
         </property>
         <item>
-         <widget class="QSplitter" name="splitter_4">
+         <widget class="QSplitter" name="xmppSplitter">
           <property name="orientation">
            <enum>Qt::Horizontal</enum>
           </property>
@@ -227,6 +289,18 @@
           </property>
           <widget class="QWidget" name="verticalLayoutWidget_8">
            <layout class="QVBoxLayout" name="verticalLayout_2">
+            <property name="leftMargin">
+             <number>0</number>
+            </property>
+            <property name="topMargin">
+             <number>6</number>
+            </property>
+            <property name="rightMargin">
+             <number>0</number>
+            </property>
+            <property name="bottomMargin">
+             <number>3</number>
+            </property>
             <item>
              <layout class="QHBoxLayout" name="horizontalLayout_15">
               <item>
@@ -248,6 +322,9 @@
                 </property>
                 <property name="verticalScrollBarPolicy">
                  <enum>Qt::ScrollBarAlwaysOff</enum>
+                </property>
+                <property name="acceptRichText">
+                 <bool>false</bool>
                 </property>
                </widget>
               </item>
@@ -324,12 +401,24 @@
           </widget>
           <widget class="QWidget" name="verticalLayoutWidget_9">
            <layout class="QVBoxLayout" name="verticalLayout_11">
+            <property name="leftMargin">
+             <number>0</number>
+            </property>
+            <property name="topMargin">
+             <number>6</number>
+            </property>
+            <property name="rightMargin">
+             <number>0</number>
+            </property>
+            <property name="bottomMargin">
+             <number>3</number>
+            </property>
             <item>
              <layout class="QVBoxLayout" name="verticalLayout_13">
               <item>
                <widget class="QTextEdit" name="xmppView">
                 <property name="lineWrapMode">
-                 <enum>QTextEdit::WidgetWidth</enum>
+                 <enum>QTextEdit::NoWrap</enum>
                 </property>
                 <property name="acceptRichText">
                  <bool>false</bool>
@@ -348,6 +437,10 @@
        <property name="layoutDirection">
         <enum>Qt::LeftToRight</enum>
        </property>
+       <attribute name="icon">
+        <iconset>
+         <normaloff>images/rtmp.png</normaloff>images/rtmp.png</iconset>
+       </attribute>
        <attribute name="title">
         <string>RTMP</string>
        </attribute>
@@ -368,7 +461,7 @@
          <number>0</number>
         </property>
         <item>
-         <widget class="QSplitter" name="splitter">
+         <widget class="QSplitter" name="rtmpSplitter">
           <property name="sizePolicy">
            <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
             <horstretch>0</horstretch>
@@ -398,6 +491,18 @@
           </property>
           <widget class="QWidget" name="verticalLayoutWidget">
            <layout class="QVBoxLayout" name="verticalLayout">
+            <property name="leftMargin">
+             <number>0</number>
+            </property>
+            <property name="topMargin">
+             <number>6</number>
+            </property>
+            <property name="rightMargin">
+             <number>0</number>
+            </property>
+            <property name="bottomMargin">
+             <number>3</number>
+            </property>
             <item>
              <layout class="QHBoxLayout" name="horizontalLayout_10">
               <item>
@@ -506,6 +611,18 @@
           </widget>
           <widget class="QWidget" name="verticalLayoutWidget_2">
            <layout class="QVBoxLayout" name="verticalLayout_6">
+            <property name="leftMargin">
+             <number>0</number>
+            </property>
+            <property name="topMargin">
+             <number>6</number>
+            </property>
+            <property name="rightMargin">
+             <number>0</number>
+            </property>
+            <property name="bottomMargin">
+             <number>3</number>
+            </property>
             <item>
              <widget class="QTextEdit" name="rtmpView">
               <property name="lineWrapMode">
@@ -523,6 +640,10 @@
        </layout>
       </widget>
       <widget class="QWidget" name="tab_rms">
+       <attribute name="icon">
+        <iconset>
+         <normaloff>images/rms.png</normaloff>images/rms.png</iconset>
+       </attribute>
        <attribute name="title">
         <string>RMS</string>
        </attribute>
@@ -540,7 +661,7 @@
          <number>0</number>
         </property>
         <item>
-         <widget class="QSplitter" name="splitter_2">
+         <widget class="QSplitter" name="rmsSplitter">
           <property name="orientation">
            <enum>Qt::Horizontal</enum>
           </property>
@@ -552,6 +673,18 @@
           </property>
           <widget class="QWidget" name="verticalLayoutWidget_3">
            <layout class="QVBoxLayout" name="verticalLayout_4">
+            <property name="leftMargin">
+             <number>0</number>
+            </property>
+            <property name="topMargin">
+             <number>6</number>
+            </property>
+            <property name="rightMargin">
+             <number>0</number>
+            </property>
+            <property name="bottomMargin">
+             <number>3</number>
+            </property>
             <item>
              <layout class="QHBoxLayout" name="horizontalLayout_11">
               <item>
@@ -636,6 +769,18 @@
             <property name="spacing">
              <number>6</number>
             </property>
+            <property name="leftMargin">
+             <number>0</number>
+            </property>
+            <property name="topMargin">
+             <number>6</number>
+            </property>
+            <property name="rightMargin">
+             <number>0</number>
+            </property>
+            <property name="bottomMargin">
+             <number>3</number>
+            </property>
             <item>
              <layout class="QVBoxLayout" name="verticalLayout_8">
               <item>
@@ -654,6 +799,10 @@
        </layout>
       </widget>
       <widget class="QWidget" name="tab_https">
+       <attribute name="icon">
+        <iconset>
+         <normaloff>images/http.png</normaloff>images/http.png</iconset>
+       </attribute>
        <attribute name="title">
         <string>HTTP/S</string>
        </attribute>
@@ -671,9 +820,12 @@
          <number>0</number>
         </property>
         <item>
-         <widget class="QSplitter" name="splitter_3">
+         <widget class="QSplitter" name="httpsSplitter">
           <property name="orientation">
            <enum>Qt::Horizontal</enum>
+          </property>
+          <property name="opaqueResize">
+           <bool>true</bool>
           </property>
           <property name="handleWidth">
            <number>2</number>
@@ -686,8 +838,14 @@
             <property name="leftMargin">
              <number>0</number>
             </property>
+            <property name="topMargin">
+             <number>6</number>
+            </property>
             <property name="rightMargin">
              <number>0</number>
+            </property>
+            <property name="bottomMargin">
+             <number>3</number>
             </property>
             <item>
              <layout class="QHBoxLayout" name="horizontalLayout_14">
@@ -710,6 +868,9 @@
                 </property>
                 <property name="verticalScrollBarPolicy">
                  <enum>Qt::ScrollBarAlwaysOff</enum>
+                </property>
+                <property name="acceptRichText">
+                 <bool>false</bool>
                 </property>
                </widget>
               </item>
@@ -766,9 +927,18 @@
            </layout>
           </widget>
           <widget class="QWidget" name="verticalLayoutWidget_5">
-           <layout class="QVBoxLayout" name="verticalLayout_5">
+           <layout class="QVBoxLayout" name="verticalLayout_5" stretch="0,0,0">
             <property name="leftMargin">
              <number>0</number>
+            </property>
+            <property name="topMargin">
+             <number>6</number>
+            </property>
+            <property name="rightMargin">
+             <number>0</number>
+            </property>
+            <property name="bottomMargin">
+             <number>3</number>
             </property>
             <item>
              <widget class="QTextEdit" name="httpsRequest">
@@ -953,6 +1123,15 @@
           <property name="leftMargin">
            <number>0</number>
           </property>
+          <property name="topMargin">
+           <number>6</number>
+          </property>
+          <property name="rightMargin">
+           <number>0</number>
+          </property>
+          <property name="bottomMargin">
+           <number>3</number>
+          </property>
           <item>
            <widget class="QTableWidget" name="mitmTableWidget">
             <property name="sizePolicy">
@@ -1040,6 +1219,18 @@
         </item>
         <item>
          <layout class="QVBoxLayout" name="mitmLayout">
+          <property name="leftMargin">
+           <number>0</number>
+          </property>
+          <property name="topMargin">
+           <number>6</number>
+          </property>
+          <property name="rightMargin">
+           <number>0</number>
+          </property>
+          <property name="bottomMargin">
+           <number>3</number>
+          </property>
           <item>
            <widget class="QLabel" name="mitmContainsLabel">
             <property name="text">
@@ -1094,6 +1285,18 @@
         </property>
         <item>
          <layout class="QVBoxLayout" name="xmppCustomLayout">
+          <property name="leftMargin">
+           <number>0</number>
+          </property>
+          <property name="topMargin">
+           <number>6</number>
+          </property>
+          <property name="rightMargin">
+           <number>0</number>
+          </property>
+          <property name="bottomMargin">
+           <number>3</number>
+          </property>
           <item>
            <widget class="QLabel" name="xmppLabel">
             <property name="text">
@@ -1121,6 +1324,15 @@
          <layout class="QVBoxLayout" name="rtmpCustomLayout">
           <property name="leftMargin">
            <number>0</number>
+          </property>
+          <property name="topMargin">
+           <number>6</number>
+          </property>
+          <property name="rightMargin">
+           <number>0</number>
+          </property>
+          <property name="bottomMargin">
+           <number>3</number>
           </property>
           <item>
            <widget class="QLabel" name="rtmpCustomLabel">
@@ -1165,7 +1377,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>919</width>
+     <width>1022</width>
      <height>21</height>
     </rect>
    </property>
@@ -1195,11 +1407,6 @@
    </widget>
    <addaction name="menuFile"/>
   </widget>
-  <widget class="QStatusBar" name="statusBar">
-   <property name="enabled">
-    <bool>true</bool>
-   </property>
-  </widget>
   <action name="actionExit">
    <property name="text">
     <string>Exit</string>
@@ -1228,7 +1435,10 @@
   </action>
   <action name="actionSave_full_client_config">
    <property name="text">
-    <string>Save full client config</string>
+    <string>Full client config</string>
+   </property>
+   <property name="toolTip">
+    <string>Full client config</string>
    </property>
   </action>
  </widget>

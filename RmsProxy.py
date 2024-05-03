@@ -11,7 +11,7 @@ class RmsProxy:
         target_hostname = self.real_host
 
         req_headers = dict(ws.request_headers)
-        print(f"req_headers {req_headers}")
+        #print(f"req_headers {req_headers}")
         if 'host' in req_headers:
             del req_headers['host']
         if 'upgrade' in req_headers:
@@ -73,12 +73,13 @@ class RmsProxy:
 
         current_time = datetime.datetime.now().strftime("%H:%M:%S")
         json_message = json.loads(display_message)
-        item_text = "[OUT] " if is_outgoing else "[IN]     "
-        item_text += f"[{current_time}] ({source}) {json_message.get('subject', '')} {json_message['payload'].get('resource','') if 'payload' in json_message else ''}"
+        item_text = f"[{current_time}] "
+        item_text += "[OUT] " if is_outgoing else "[IN]     "
+        item_text += f"({source}) {json_message.get('subject', '')} {json_message['payload'].get('resource','') if 'payload' in json_message else ''}"
 
         item = QListWidgetItem()
         item.setText(item_text)
-        item.setData(256, display_message)
+        item.setData(256, json.dumps(json_message, indent=4))
         UiObjects.rmsList.addItem(item)
 
 

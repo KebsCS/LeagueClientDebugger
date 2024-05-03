@@ -85,8 +85,9 @@ def log_message(parser, is_outgoing):
     #print('[RTMP] ' + ('>' if is_outgoing else '<') + " " + str(parser.current_message))
 
     current_time = datetime.datetime.now().strftime("%H:%M:%S")
-    text = "[OUT] " if is_outgoing else "[IN]     "
-    text += f"[{current_time}] "
+    text = f"[{current_time}] "
+    text += "[OUT] " if is_outgoing else "[IN]     "
+
     if parser.current_message_parsed:
         item = QListWidgetItem()
 
@@ -102,13 +103,13 @@ def log_message(parser, is_outgoing):
             text += f"{messaging} {destination} {operation}"
 
         item.setText(text)
-        item.setData(256, json.dumps(current_message))
+        item.setData(256, json.dumps(current_message, indent=4))
 
         UiObjects.rtmpList.addItem(item)
     else:
         item = QListWidgetItem()
         item.setText(text)
-        item.setData(257, str(parser.current_message))
+        item.setData(256, str(parser.current_message))
         UiObjects.rtmpList.addItem(item)
 
 
