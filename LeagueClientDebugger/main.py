@@ -1,4 +1,4 @@
-from LoLXMPPDebugger import Ui_LoLXMPPDebuggerClass
+from LeagueClientDebugger import Ui_LeagueClientDebuggerClass
 from DebuggerOptions import Ui_Dialog
 import sys, json, time, os, io, asyncio, socket, pymem, requests, gzip
 from datetime import datetime
@@ -29,11 +29,11 @@ from LcuWebsocket import LcuWebsocket
 
 os.environ['no_proxy'] = '*'
 
-#todo debug dll source, lcu in custom
-#todo change file names, lock scroll to bottom like in fiddler instead of checkbox
+#todo lcu in custom, lcu settings, optimize code
+#todo lock scroll to bottom like in fiddler instead of checkbox
 #todo, finish mitm, vairables for mitm, like $timestamp$ or some python code executing
 
-class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
+class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
 
     counter = 0
     saveDir = QCoreApplication.applicationDirPath()
@@ -60,10 +60,15 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
         UiObjects.optionsIncludeLCU = dialog_ui.optionsIncludeLCU
 
         self.icon_xmpp = QIcon("images/xmpp.png")
+        self.tabWidget.setTabIcon(1, self.icon_xmpp)
         self.icon_rtmp = QIcon("images/rtmp.png")
+        self.tabWidget.setTabIcon(2, self.icon_rtmp)
         self.icon_rms = QIcon("images/rms.png")
+        self.tabWidget.setTabIcon(3, self.icon_rms)
         self.icon_http = QIcon("images/http.png")
+        self.tabWidget.setTabIcon(4, self.icon_http)
         self.icon_lcu = QIcon("images/lcu.png")
+        self.tabWidget.setTabIcon(5, self.icon_lcu)
 
         self.mitmTableWidget.setColumnWidth(0, 104)
         self.mitmTableWidget.setColumnWidth(1, 73)
@@ -193,7 +198,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
     def on_allButtonInject_clicked(self):
         try:
             current_dir = os.path.dirname(os.path.abspath(__file__))
-            dll_path = os.path.join(current_dir, "LeagueHooker.dll")
+            dll_path = os.path.join(current_dir, "LeagueHooker/x64/Release/LeagueHooker.dll")
 
             if not os.path.exists(dll_path):
                 print("DLL file not found:", dll_path)
@@ -579,7 +584,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LoLXMPPDebuggerClass):
             clientPath = json.load(file)["rc_default"]
             league = QProcess(None)
             patchline = '--launch-patchline=' + 'pbe' if 'PBE' in selected_region else 'live'
-            args = ['--allow-multiple-clients', f'--launch-product=league_of_legends', patchline, f'--client-config-url=http://127.0.0.1:{ProxyServers.client_config_port}']
+            args = ['--allow-multiple-clients',  f'--launch-product=league_of_legends', patchline, f'--client-config-url=http://127.0.0.1:{ProxyServers.client_config_port}']
             league.startDetached(clientPath, args)
 
     @pyqtSlot()
