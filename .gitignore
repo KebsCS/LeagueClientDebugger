@@ -1,9 +1,9 @@
 LeagueClientDebugger/venv/
 LeagueClientDebugger/.idea/
 LeagueClientDebugger/__pycache__/
-LeagueClientDebugger/config.json
+LeagueClientDebugger/config*.json
 LeagueClientDebugger/fullconfig.txt
-LeagueClientDebugger/all_requests.txt
+LeagueClientDebugger/all_requests*.txt
 LeagueClientDebugger/LeagueHooker/.vs/
 LeagueClientDebugger/LeagueHooker/x64/Release/LeagueHooker.iobj
 LeagueClientDebugger/LeagueHooker/x64/Release/LeagueHooker.ipdb

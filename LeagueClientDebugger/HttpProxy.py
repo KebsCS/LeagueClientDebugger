@@ -9,17 +9,18 @@ import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 CIPHERS = [
-	'ECDHE-ECDSA-AES128-GCM-SHA256',
-	'ECDHE-ECDSA-CHACHA20-POLY1305',
-	'ECDHE-RSA-AES128-GCM-SHA256',
-	'ECDHE-RSA-CHACHA20-POLY1305',
-	'ECDHE+AES128',
-	'RSA+AES128',
-	'ECDHE+AES256',
-	'RSA+AES256',
-	'ECDHE+3DES',
-	'RSA+3DES'
+    'ECDHE-ECDSA-AES128-GCM-SHA256',
+    'ECDHE-ECDSA-CHACHA20-POLY1305',
+    'ECDHE-RSA-AES128-GCM-SHA256',
+    'ECDHE-RSA-CHACHA20-POLY1305',
+    'ECDHE+AES128',
+    'RSA+AES128',
+    'ECDHE+AES256',
+    'RSA+AES256',
+    'ECDHE+3DES',
+    'RSA+3DES'
 ]
+
 
 class SSLAdapter(HTTPAdapter):
     def init_poolmanager(self, *a: Any, **k: Any) -> None:
@@ -69,8 +70,6 @@ def to_raw_response(response: requests.Response) -> bytearray:
     headers = raw.headers
     for name in headers.keys():
         for value in headers.getlist(name):
-            if name == 'Content-Length':
-                value = str(len(response.content))
             bytearr.extend(_format_header(name, value))
 
     if len(response.content) > 0 and 'Content-Length' not in headers:
@@ -134,10 +133,6 @@ def to_raw_request(request) -> bytearray:
 
 
 class HttpProxy:
-    #todo move, maybe diff class
-    geoPasUrl = ""  # https://riot-geo.pas.si.riotgames.com/pas/v1/service/chat
-    geoPasBody = ""
-
     session = requests.sessions.Session()
     session.mount('https://', SSLAdapter())
 
@@ -187,14 +182,11 @@ class HttpProxy:
         def edit_response(self, response: requests.Response) -> requests.Response:
             if response.url == "https://auth.riotgames.com/.well-known/openid-configuration":
                 response._content = response.text.replace("https://auth.riotgames.com",
-                                                     f"http://localhost:{ProxyServers.auth_port}").encode()
-            # elif response.url == HttpProxy.geoPasUrl:
-            #     HttpProxy.geoPasBody = response.text
-            #     print(HttpProxy.geoPasBody)
+                                                          f"http://localhost:{ProxyServers.auth_port}").encode()
 
             return response
 
-        def send_response(self, response : bytes):
+        def send_response(self, response: bytes):
             self.transport.write(response)
 
         def on_message_complete(self):
@@ -210,6 +202,8 @@ class HttpProxy:
 
             if "Content-Length" in response.headers:
                 response.headers["Content-Length"] = str(len(response.text))
+            if "Content-Length" in response.raw.headers:
+                response.raw.headers["Content-Length"] = str(len(response.text))
             if "Content-Encoding" in response.raw.headers:  # remove gzip
                 encodings = [encoding.strip() for encoding in response.raw.headers["Content-Encoding"].split(",")]
                 encodings = [encoding for encoding in encodings if encoding.lower() != "gzip"]
@@ -248,7 +242,12 @@ class HttpProxy:
             print("json indent response failed")
             print(raw_response_str)
 
-        UiObjects.httpsList.addItem(item)
+        scrollbar = UiObjects.httpsList.verticalScrollBar()
+        if not scrollbar or scrollbar.value() == scrollbar.maximum():
+            UiObjects.httpsList.addItem(item)
+            UiObjects.httpsList.scrollToBottom()
+        else:
+            UiObjects.httpsList.addItem(item)
 
     async def run_server(self, host, port, original_host):
         loop = asyncio.get_running_loop()

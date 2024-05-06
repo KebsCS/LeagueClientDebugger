@@ -22,7 +22,8 @@
      <item>
       <widget class="QCheckBox" name="optionsIncludeLCU">
        <property name="text">
-        <string>Include LCU in Start tab</string>
+        <string>Include LCU in Start tab 
+(Not recommended, slows down the app)</string>
        </property>
       </widget>
      </item>
@@ -37,6 +38,14 @@
       <widget class="QCheckBox" name="optionsEnableInject">
        <property name="text">
         <string>Enable debug dll injecting</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QCheckBox" name="optionsIncludeJWTs">
+       <property name="text">
+        <string>Include decoded JWTs in search
+(Currently only in Start tab)</string>
        </property>
       </widget>
      </item>

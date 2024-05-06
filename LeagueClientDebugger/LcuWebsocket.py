@@ -3,19 +3,13 @@ from typing import Dict, Generator, List
 from psutil import STATUS_ZOMBIE, Process, process_iter
 from UiObjects import *
 
+
 def _return_ux_process() -> Generator[Process, None, None]:
     for process in process_iter(attrs=["cmdline"]):
         if process.status() == STATUS_ZOMBIE:
             continue
 
-        cmdline: List[str] = process.info.get("cmdline", [])
-
         if process.name() in ["LeagueClientUx.exe", "LeagueClientUx"]:
-            yield process
-
-        # Check cmdline for the executable, especially useful in Linux environments
-        # where process names might differ due to compatibility layers like wine.
-        if cmdline and cmdline[0].endswith("LeagueClientUx.exe"):
             yield process
 
 
@@ -29,6 +23,7 @@ def parse_cmdline_args(cmdline_args) -> Dict[str, str]:
 
 
 class LcuWebsocket:
+    global_ws = None
     is_running = False
 
     lcu_pid = None
@@ -46,14 +41,18 @@ class LcuWebsocket:
 
     async def get_process(self):
         process = next(_return_ux_process(), None)
-        while not process:
+        while not process and self.is_running:
             await asyncio.sleep(1)
             process = next(_return_ux_process(), None)
         return process
 
-
     async def run(self):
+        if self.is_running:
+            return
+        self.is_running = True
         process = await self.get_process()
+        if not self.is_running:
+            return
         await self.process_args(process)
 
         headers = {
@@ -73,7 +72,7 @@ class LcuWebsocket:
                 async with websockets.connect("wss://127.0.0.1:" + str(self.lcu_port), extra_headers=headers,
                                               ssl=ssl_context, max_size=2**32, ping_interval=None) as target_ws:
                     print("[LCU] Started LCU websocket")
-                    LcuWebsocket.is_running = True
+                    self.global_ws = target_ws
                     await target_ws.send(b"[5, \"OnJsonApiEvent\"]")
                     async for message in target_ws:
                         await LcuWebsocket.log_message(message)
@@ -82,6 +81,12 @@ class LcuWebsocket:
             except ConnectionRefusedError:
                 attempt += 1
                 await asyncio.sleep(1)
+
+    async def close(self):
+        self.is_running = False
+        if self.global_ws:
+            await self.global_ws.close()
+
 
     @staticmethod
     async def log_message(message):
@@ -95,7 +100,12 @@ class LcuWebsocket:
         item.setText(text)
         item.setData(256, data)
 
-        UiObjects.lcuList.addItem(item)
+        scrollbar = UiObjects.lcuList.verticalScrollBar()
+        if not scrollbar or scrollbar.value() == scrollbar.maximum():
+            UiObjects.lcuList.addItem(item)
+            UiObjects.lcuList.scrollToBottom()
+        else:
+            UiObjects.lcuList.addItem(item)
 
     async def start_ws(self):
         connection = await self.run()

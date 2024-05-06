@@ -29,6 +29,9 @@ class Ui_Dialog(object):
         self.optionsEnableInject = QtWidgets.QCheckBox(Dialog)
         self.optionsEnableInject.setObjectName("optionsEnableInject")
         self.verticalLayout_3.addWidget(self.optionsEnableInject)
+        self.optionsIncludeJWTs = QtWidgets.QCheckBox(Dialog)
+        self.optionsIncludeJWTs.setObjectName("optionsIncludeJWTs")
+        self.verticalLayout_3.addWidget(self.optionsIncludeJWTs)
         spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
         self.verticalLayout_3.addItem(spacerItem)
         self.horizontalLayout.addLayout(self.verticalLayout_3)
@@ -42,9 +45,12 @@ class Ui_Dialog(object):
     def retranslateUi(self, Dialog):
         _translate = QtCore.QCoreApplication.translate
         Dialog.setWindowTitle(_translate("Dialog", "Options"))
-        self.optionsIncludeLCU.setText(_translate("Dialog", "Include LCU in Start tab"))
+        self.optionsIncludeLCU.setText(_translate("Dialog", "Include LCU in Start tab \n"
+"(Not recommended, slows down the app)"))
         self.optionsDisableVanguard.setText(_translate("Dialog", "Disable Vanguard"))
         self.optionsEnableInject.setText(_translate("Dialog", "Enable debug dll injecting"))
+        self.optionsIncludeJWTs.setText(_translate("Dialog", "Include decoded JWTs in search\n"
+"(Currently only in Start tab)"))
 
 
 if __name__ == "__main__":

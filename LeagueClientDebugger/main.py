@@ -1,13 +1,12 @@
 from LeagueClientDebugger import Ui_LeagueClientDebuggerClass
 from DebuggerOptions import Ui_Dialog
-import sys, json, time, os, io, asyncio, socket, pymem, requests, gzip
-from datetime import datetime
+import sys, json, time, os, io, asyncio, pymem, requests, gzip, re, base64, datetime
 from lxml import etree
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import pyqtSlot, pyqtSignal, Qt, QEvent, QByteArray
 from PyQt5.QtCore import QObject, QProcess, QCoreApplication, QItemSelection, QModelIndex
 from PyQt5.QtWidgets import QMessageBox, QFileDialog, QListWidgetItem, QTableWidgetItem, QComboBox, QPushButton
-from PyQt5.QtGui import QColor, QIcon, QTextCharFormat, QTextCursor, QTextDocument, QSyntaxHighlighter
+from PyQt5.QtGui import QColor, QIcon, QTextCharFormat, QTextCursor, QTextDocument, QSyntaxHighlighter, QGuiApplication
 from qasync import QEventLoop, QApplication
 from ConfigProxy import ConfigProxy
 from ChatProxy import ChatProxy
@@ -29,8 +28,12 @@ from LcuWebsocket import LcuWebsocket
 
 os.environ['no_proxy'] = '*'
 
-#todo lcu in custom, lcu settings, optimize code
-#todo lock scroll to bottom like in fiddler instead of checkbox
+JWT_PATTERN = r'eyJ[A-Za-z0-9=_-]+(?:\.[A-Za-z0-9=_-]+){2,}'
+
+#todo decode jwts in all tabs
+#todo add auto inject
+#todo lcu in custom, lcu settings, optimize code, relogging, multi client
+#todo speed up the listwidgets, maybe listview
 #todo, finish mitm, vairables for mitm, like $timestamp$ or some python code executing
 
 class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
@@ -38,7 +41,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
     counter = 0
     saveDir = QCoreApplication.applicationDirPath()
     startTime = time.time()
-    configFileName = "config.json"
+    configFileName = "config_lcd.json"
 
     port = 0
     chatPort = 0
@@ -48,16 +51,29 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         self.setupUi(self)
         self.allButtonInject.hide()
 
+        self.allTextRCArgs.hide()
+        self.allLabelRC.hide()
+        self.allTextLCArgs.hide()
+        self.allCheckboxLC.hide()
+        # this lc method adds arguments to client config
+        # other method would be running rc services without product and patchline
+        # and then launching lc manually, that skips all checks but you need to fill rc port and token args
+        UiObjects.allCheckboxLC = self.allCheckboxLC
+        UiObjects.allTextLCArgs = self.allTextLCArgs
+        self.allButtonTool.clicked.connect(self.show_hide_args)
+
+        self.allButtonDecodeJWTs.setEnabled(False)
+
         self.options_dialog = QtWidgets.QDialog()
         dialog_ui = Ui_Dialog()
         dialog_ui.setupUi(self.options_dialog)
         self.options_dialog.setWindowFlags(self.options_dialog.windowFlags() & ~Qt.WindowContextHelpButtonHint | Qt.WindowCloseButtonHint)
         UiObjects.optionsDisableVanguard = dialog_ui.optionsDisableVanguard
 
-        #maybe add auto inject when leagueclient process detected
         UiObjects.optionsEnableInject = dialog_ui.optionsEnableInject
         dialog_ui.optionsEnableInject.stateChanged.connect(lambda state: self.allButtonInject.show() if state == Qt.Checked else self.allButtonInject.hide())
         UiObjects.optionsIncludeLCU = dialog_ui.optionsIncludeLCU
+        UiObjects.optionsIncludeJWTs = dialog_ui.optionsIncludeJWTs
 
         self.icon_xmpp = QIcon("images/xmpp.png")
         self.tabWidget.setTabIcon(1, self.icon_xmpp)
@@ -75,16 +91,12 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         self.mitmTableWidget.setColumnWidth(2, 262)
         self.tabWidget.setMovable(True)
 
-        self.allList.currentItemChanged.connect(self.on_allList_itemClicked)
-        self.allScrollToBottom.setChecked(True)
-
+        UiObjects.allList = self.allList
         UiObjects.xmppList = self.xmppList
-        self.xmppList.currentItemChanged.connect(self.on_xmppList_itemClicked)
-        self.xmppScrollToBottom.setChecked(True)
-
         UiObjects.rtmpList = self.rtmpList
-        self.rtmpList.currentItemChanged.connect(self.on_rtmpList_itemClicked)
-        self.rtmpScrollToBottom.setChecked(True)
+        UiObjects.rmsList = self.rmsList
+        UiObjects.httpsList = self.httpsList
+        UiObjects.lcuList = self.lcuList
 
         self.allTextSearch.installEventFilter(self)
         self.xmppTextSearch.installEventFilter(self)
@@ -104,23 +116,12 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             lambda parent, start, end: self.add_item_to_all(self.xmppList, start))
         self.rtmpList.model().rowsInserted.connect(
             lambda parent, start, end: self.add_item_to_all(self.rtmpList, start))
-        self.rmsList.model().rowsInserted.connect(lambda parent, start, end: self.add_item_to_all(self.rmsList, start))
+        self.rmsList.model().rowsInserted.connect(
+            lambda parent, start, end: self.add_item_to_all(self.rmsList, start))
         self.httpsList.model().rowsInserted.connect(
             lambda parent, start, end: self.add_item_to_all(self.httpsList, start))
         self.lcuList.model().rowsInserted.connect(
             lambda parent, start, end: self.add_item_to_all(self.lcuList, start))
-
-        UiObjects.rmsList = self.rmsList
-        self.rmsList.currentItemChanged.connect(self.on_rmsList_itemClicked)
-        self.rmsScrollToBottom.setChecked(True)
-
-        UiObjects.httpsList = self.httpsList
-        self.httpsList.currentItemChanged.connect(self.on_httpsList_itemClicked)
-        self.httpsScrollToBottom.setChecked(True)
-
-        UiObjects.lcuList = self.lcuList
-        self.lcuList.currentItemChanged.connect(self.on_lcuList_itemClicked)
-        self.lcuScrollToBottom.setChecked(True)
 
 
         SystemYaml().read()
@@ -130,8 +131,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         self.LoadConfig()
 
         # after load config, because searching for the process lags a bit
-        # todo disconnect on unchecked
-        self.lcuEnabled.stateChanged.connect(lambda state: self.start_lcu_ws() if state == Qt.Checked else None)
+        self.lcu_ws = LcuWebsocket()
+        self.lcuEnabled.stateChanged.connect(lambda state: self.start_lcu_ws() if state == Qt.Checked else loop.create_task(self.lcu_ws.close()))
 
         UiObjects.mitmTableWidget = self.mitmTableWidget
 
@@ -141,58 +142,62 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
 
         self.proxies_started = False
 
+    def show_hide_args(self):
+        if self.allTextRCArgs.isHidden():
+            self.allTextRCArgs.show()
+            self.allLabelRC.show()
+            self.allTextLCArgs.show()
+            self.allCheckboxLC.show()
+        else:
+            self.allTextRCArgs.hide()
+            self.allLabelRC.hide()
+            self.allTextLCArgs.hide()
+            self.allCheckboxLC.hide()
+
     def eventFilter(self, obj, event):
+        def handle_enter_in_textedit(text_edit, button):
+            if obj is text_edit and event.key() == Qt.Key_Return and text_edit.hasFocus():
+                button.click()
+                return True
+            return False
+
+        def handle_ctrl_f(tab, text_edit):
+            if current_tab_index == self.tabWidget.indexOf(tab):
+                if event.key() == Qt.Key_F and event.modifiers() == Qt.ControlModifier:
+                    text_edit.setFocus()
+                    return True
+            return False
+
         current_tab_index = self.tabWidget.currentIndex()
-        if event.type() == QEvent.KeyPress and obj is self.allTextSearch:
-            if event.key() == Qt.Key_Return and self.allTextSearch.hasFocus():
-                self.on_allButtonSearch_clicked()
+
+        if event.type() == QEvent.KeyPress:
+            if handle_enter_in_textedit(self.allTextSearch, self.allButtonSearch):
                 return True
-        elif event.type() == QEvent.KeyPress and obj is self.xmppTextSearch:
-            if event.key() == Qt.Key_Return and self.xmppTextSearch.hasFocus():
-                self.on_xmppButtonSearch_clicked()
+            elif handle_enter_in_textedit(self.xmppTextSearch, self.xmppButtonSearch):
                 return True
-        elif event.type() == QEvent.KeyPress and obj is self.rtmpTextSearch:
-            if event.key() == Qt.Key_Return and self.rtmpTextSearch.hasFocus():
-                self.on_rtmpButtonSearch_clicked()
+            elif handle_enter_in_textedit(self.rtmpTextSearch, self.rtmpButtonSearch):
                 return True
-        elif event.type() == QEvent.KeyPress and obj is self.rmsTextSearch:
-            if event.key() == Qt.Key_Return and self.rmsTextSearch.hasFocus():
-                self.on_rmsButtonSearch_clicked()
+            elif handle_enter_in_textedit(self.rmsTextSearch, self.rmsButtonSearch):
                 return True
-        elif event.type() == QEvent.KeyPress and obj is self.httpsTextSearch:
-            if event.key() == Qt.Key_Return and self.httpsTextSearch.hasFocus():
-                self.on_httpsButtonSearch_clicked()
+            elif handle_enter_in_textedit(self.httpsTextSearch, self.httpsButtonSearch):
                 return True
-        elif event.type() == QEvent.KeyPress and obj is self.lcuTextSearch:
-            if event.key() == Qt.Key_Return and self.lcuTextSearch.hasFocus():
-                self.on_lcuButtonSearch_clicked()
+            elif handle_enter_in_textedit(self.lcuTextSearch, self.lcuButtonSearch):
                 return True
 
-        elif event.type() == QEvent.KeyPress and current_tab_index == self.tabWidget.indexOf(self.tab_start):
-            if event.key() == Qt.Key_F and event.modifiers() == Qt.ControlModifier:
-                self.allTextSearch.setFocus()
+            elif handle_ctrl_f(self.tab_start, self.allTextSearch):
                 return True
-        elif event.type() == QEvent.KeyPress and current_tab_index == self.tabWidget.indexOf(self.tab_xmpp):
-            if event.key() == Qt.Key_F and event.modifiers() == Qt.ControlModifier:
-                self.xmppTextSearch.setFocus()
+            elif handle_ctrl_f(self.tab_xmpp, self.xmppTextSearch):
                 return True
-        elif event.type() == QEvent.KeyPress and current_tab_index == self.tabWidget.indexOf(self.tab_rtmp):
-            if event.key() == Qt.Key_F and event.modifiers() == Qt.ControlModifier:
-                self.rtmpTextSearch.setFocus()
+            elif handle_ctrl_f(self.tab_rtmp, self.rtmpTextSearch):
                 return True
-        elif event.type() == QEvent.KeyPress and current_tab_index == self.tabWidget.indexOf(self.tab_rms):
-            if event.key() == Qt.Key_F and event.modifiers() == Qt.ControlModifier:
-                self.rmsTextSearch.setFocus()
+            elif handle_ctrl_f(self.tab_rms, self.rmsTextSearch):
                 return True
-        elif event.type() == QEvent.KeyPress and current_tab_index == self.tabWidget.indexOf(self.tab_https):
-            if event.key() == Qt.Key_F and event.modifiers() == Qt.ControlModifier:
-                self.httpsTextSearch.setFocus()
+            elif handle_ctrl_f(self.tab_https, self.httpsTextSearch):
                 return True
-        elif event.type() == QEvent.KeyPress and current_tab_index == self.tabWidget.indexOf(self.tab_lcu):
-            if event.key() == Qt.Key_F and event.modifiers() == Qt.ControlModifier:
-                self.lcuTextSearch.setFocus()
+            elif handle_ctrl_f(self.tab_lcu, self.lcuTextSearch):
                 return True
-        return False # super().eventFilter(obj, event)
+
+        return False    # super().eventFilter(obj, event)
 
     @pyqtSlot()
     def on_allButtonInject_clicked(self):
@@ -208,9 +213,6 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         except Exception as e:
             print("Inject failed ", e)
 
-    def closeEvent(self, event):
-       self.SaveConfig()
-       event.accept()
 
     @pyqtSlot(QTableWidgetItem)
     def on_mitmTableWidget_itemChanged(self, item: QTableWidgetItem):
@@ -383,50 +385,112 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                     loop.create_task(RmsProxy.global_ws.send(gzip.compress(message)))
             elif protocol == "RTMP":
                 #todo
-                QMessageBox.information(self, "Info", "RTMP custom requests are not ready yet")
+                QMessageBox.about(self, "Info", "RTMP custom requests are not ready yet")
 
         except Exception as e:
             print("Failed to send custom request ", e)
 
 
-    @pyqtSlot(QListWidgetItem)
-    def on_allList_itemClicked(self, item: QListWidgetItem):
-        if len(self.allList.selectedItems()) == 0:
+    original_text = ""
+    is_decoded = False
+    @pyqtSlot(int)
+    def on_allList_currentRowChanged(self, row):
+        if row == -1:
             return
-        item = self.allList.selectedItems()[0]
+        item = self.allList.item(row)
         data = item.data(256)
-        self.allView.setText(json.dumps(data, indent=4) if isinstance(data, dict) else data)
+        text = json.dumps(data, indent=4) if isinstance(data, dict) else data
+        self.allView.setText(text)
 
-    @pyqtSlot(QListWidgetItem)
-    def on_xmppList_itemClicked(self, item: QListWidgetItem):
-        if len(self.xmppList.selectedItems()) == 0:
+        matches = re.findall(JWT_PATTERN, text)
+        if matches:
+            self.allButtonDecodeJWTs.setEnabled(True)
+        else:
+            self.allButtonDecodeJWTs.setEnabled(False)
+
+        self.is_decoded = False
+        self.allButtonDecodeJWTs.setText("Decode JWTs")
+
+    @pyqtSlot()
+    def on_allButtonDecodeJWTs_clicked(self):
+        scroll_value = self.allView.verticalScrollBar().value()
+        if not self.is_decoded:
+            self.original_text = self.allView.toPlainText()
+            text = self.original_text
+            matches = re.findall(JWT_PATTERN, text)
+            for match in matches:
+                payload = match.split('.')[1]
+                payload += '=' * ((4 - len(payload) % 4) % 4)
+                payload = payload.replace('-', '+').replace('_', '/')
+                try:
+                    decoded_payload = base64.urlsafe_b64decode(payload.encode()).decode('utf-8')
+                    json_payload = bytes(decoded_payload, 'utf-8').decode('unicode_escape')
+                    decoded_text = json.dumps(json.loads(json_payload), indent=4)
+                    text = text.replace(match, decoded_text)
+                except UnicodeDecodeError:
+                    pass
+            self.allView.setText(text)
+            self.allView.verticalScrollBar().setValue(scroll_value)
+            self.allButtonDecodeJWTs.setText("Original text")
+            self.is_decoded = True
+        else:
+            self.allView.setText(self.original_text)  # Restore original text
+            self.allView.verticalScrollBar().setValue(scroll_value)
+            self.allButtonDecodeJWTs.setText("Decode JWTs")
+            self.is_decoded = False
+
+    @pyqtSlot(int)
+    def on_xmppList_currentRowChanged(self, row):
+        if row == -1:
             return
-        item = self.xmppList.selectedItems()[0]
-        self.xmppView.setText(item.data(256))
+        item = self.xmppList.item(row)
+
+        def pretty_xml(xml_string):
+            try:
+                root = etree.fromstring(xml_string.encode("utf-8"))
+                return etree.tostring(root, pretty_print=True).decode()
+            except etree.XMLSyntaxError:
+                return xml_string
+
+        self.xmppView.setText(pretty_xml(item.data(256)))
 
 
-    @pyqtSlot(QListWidgetItem)
-    def on_rtmpList_itemClicked(self):
-        # todo, is called twice, from itemClicked and selectionchanged
-        # workaround because selectionchanged works only after it has been selected at least once
-        if len(self.rtmpList.selectedItems()) == 0:
+    @pyqtSlot()
+    def on_xmppButtonCopy_clicked(self):
+        if not self.xmppView.toPlainText().strip() or len(self.xmppList.selectedItems()) == 0:
             return
-        item = self.rtmpList.selectedItems()[0]
+        cb = QGuiApplication.clipboard()
+        cb.clear(mode=cb.Clipboard)
+        cb.setText(self.xmppList.selectedItems()[0].data(256), mode=cb.Clipboard)
+
+
+    @pyqtSlot(int)
+    def on_rtmpList_currentRowChanged(self, row):
+        if row == -1:
+            return
+        item = self.rtmpList.item(row)
         self.rtmpView.setText(item.data(256))
 
-    @pyqtSlot(QListWidgetItem)
-    def on_httpsList_itemClicked(self):
-        if len(self.httpsList.selectedItems()) == 0:
+    @pyqtSlot(int)
+    def on_rmsList_currentRowChanged(self, row):
+        if row == -1:
             return
-        item = self.httpsList.selectedItems()[0]
+        item = self.rmsList.item(row)
+        self.rmsView.setText(json.dumps(item.data(256), indent=4))
+
+    @pyqtSlot(int)
+    def on_httpsList_currentRowChanged(self, row):
+        if row == -1:
+            return
+        item = self.httpsList.item(row)
         self.httpsRequest.setText(item.data(256))
         self.httpsResponse.setText(item.data(257))
 
-    @pyqtSlot(QListWidgetItem)
-    def on_lcuList_itemClicked(self):
-        if len(self.lcuList.selectedItems()) == 0:
+    @pyqtSlot(int)
+    def on_lcuList_currentRowChanged(self, row):
+        if row == -1:
             return
-        item = self.lcuList.selectedItems()[0]
+        item = self.lcuList.item(row)
         self.lcuView.setText(json.dumps(item.data(256), indent=4))
 
     @pyqtSlot()
@@ -437,6 +501,21 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         for index in range(self.allList.count()):
             item = self.allList.item(index)
             text = item.data(256) if item.data(256) else " "
+            if isinstance(text, dict):
+                text = json.dumps(text)
+
+            if UiObjects.optionsIncludeJWTs.isChecked():
+                matches = re.findall(JWT_PATTERN, text)
+                for match in matches:
+                    payload = match.split('.')[1]
+                    payload += '=' * ((4 - len(payload) % 4) % 4)
+                    payload = payload.replace('-', '+').replace('_', '/')
+                    try:
+                        decoded_payload = base64.urlsafe_b64decode(payload.encode()).decode('utf-8')
+                        text += "\r\n" + decoded_payload
+                    except UnicodeDecodeError:
+                        pass
+
             if search_text in text.lower():
                 item.setBackground(Qt.yellow)
             else:
@@ -476,6 +555,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         for index in range(self.rmsList.count()):
             item = self.rmsList.item(index)
             text = item.data(256) if item.data(256) else ""
+            if isinstance(text, dict):
+                text = json.dumps(text)
             if search_text in text.lower():
                 item.setBackground(Qt.yellow)
             else:
@@ -502,31 +583,25 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         for index in range(self.lcuList.count()):
             item = self.lcuList.item(index)
             text = item.data(256) if item.data(256) else ""
+            if isinstance(text, dict):
+                text = json.dumps(text)
             if search_text in text.lower():
                 item.setBackground(Qt.yellow)
             else:
                 item.setBackground(Qt.transparent)
 
-    @pyqtSlot(QListWidgetItem)
-    def on_rmsList_itemClicked(self):
-        # todo, is called twice, from itemClicked and selectionchanged
-        # workaround because selectionchanged works only after it has been selected at least once
-        if len(self.rmsList.selectedItems()) == 0:
-            return
-        item = self.rmsList.selectedItems()[0]
-        self.rmsView.setText(item.data(256))
-
     def start_proxy(self, original_host, port):
+        if not original_host:
+            return
         httpProxy = HttpProxy()
         loop = asyncio.get_event_loop()
         loop.create_task(httpProxy.run_server("127.0.0.1", port, original_host))
 
     def start_lcu_ws(self):
-        if LcuWebsocket.is_running:
+        if self.lcu_ws.global_ws:
             return
-        lcu_ws = LcuWebsocket()
         loop = asyncio.get_event_loop()
-        loop.create_task(lcu_ws.start_ws())
+        loop.create_task(self.lcu_ws.start_ws())
 
     @pyqtSlot()
     def on_allLaunchLeague_clicked(self):
@@ -545,7 +620,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             loop = asyncio.get_event_loop()
             lcds = SystemYaml.lcds[selected_region]
             loop.create_task(
-                rtmp_proxy.start_client_proxy("127.0.0.1", lcds.split(":")[1], lcds.split(":")[0], lcds.split(":")[1]))
+                rtmp_proxy.start_client_proxy("127.0.0.1", ProxyServers.rtmp_port, lcds.split(":")[0], lcds.split(":")[1]))
 
             self.start_proxy(SystemYaml.ledge[selected_region], ProxyServers.ledge_port)
             self.start_proxy(SystemYaml.entitlements[selected_region], ProxyServers.entitlements_port)
@@ -553,26 +628,20 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             self.start_proxy(SystemYaml.email[selected_region], ProxyServers.email_port)
             self.start_proxy(SystemYaml.payments[selected_region], ProxyServers.payments_port)
 
-            self.start_proxy("https://playerpreferences.riotgames.com", ProxyServers.playerpreferences_port) #todo could get url from config proxy
-            self.start_proxy("https://riot-geo.pas.si.riotgames.com", ProxyServers.geo_port) #todo could get url from config proxy
+            #todo get all hardcoded urls from config proxy if possible
 
-            self.start_proxy("https://auth.riotgames.com", ProxyServers.auth_port)  # todo could get url from config proxy
-
-            self.start_proxy("https://authenticate.riotgames.com", ProxyServers.authenticator_port)  # todo could get url from config proxy
-
-            self.start_proxy("https://api.account.riotgames.com", ProxyServers.accounts_port)  # todo could get url from config proxy
-
+            self.start_proxy("https://playerpreferences.riotgames.com", ProxyServers.playerpreferences_port)
+            self.start_proxy("https://riot-geo.pas.si.riotgames.com", ProxyServers.geo_port)
+            self.start_proxy("https://auth.riotgames.com", ProxyServers.auth_port)
+            self.start_proxy("https://authenticate.riotgames.com", ProxyServers.authenticator_port)
+            self.start_proxy("https://api.account.riotgames.com", ProxyServers.accounts_port)
             self.start_proxy("https://content.publishing.riotgames.com",
-                             ProxyServers.publishing_content_port)  # todo could get url from config proxy
+                             ProxyServers.publishing_content_port)
 
-            self.start_proxy("https://sieve.services.riotcdn.net", ProxyServers.sieve_port)  # todo could get url from config proxy
-
-            self.start_proxy("https://scd.riotcdn.net", ProxyServers.scd_port)  # todo could get url from config proxy
-
-            self.start_proxy("https://player-lifecycle-euc.publishing.riotgames.com", ProxyServers.lifecycle_port)  # todo could get url from config proxy also there are different servers
-
+            self.start_proxy("https://sieve.services.riotcdn.net", ProxyServers.sieve_port)
+            self.start_proxy("https://scd.riotcdn.net", ProxyServers.scd_port)
+            self.start_proxy("https://player-lifecycle-euc.publishing.riotgames.com", ProxyServers.lifecycle_port)
             self.start_proxy("https://eu.lers.loyalty.riotgames.com", ProxyServers.loyalty_port )
-
             self.start_proxy("https://pcbs.loyalty.riotgames.com", ProxyServers.pcbs_loyalty_port)
 
             self.proxies_started = True
@@ -580,12 +649,17 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         if self.lcuEnabled.isChecked():
             self.start_lcu_ws()
 
-        with open("C:/ProgramData/Riot Games/RiotClientInstalls.json", 'r') as file:
+        with open(os.getenv('PROGRAMDATA') + "/Riot Games/RiotClientInstalls.json", 'r') as file: # RiotClientServices.exe
             clientPath = json.load(file)["rc_default"]
             league = QProcess(None)
-            patchline = '--launch-patchline=' + 'pbe' if 'PBE' in selected_region else 'live'
-            args = ['--allow-multiple-clients',  f'--launch-product=league_of_legends', patchline, f'--client-config-url=http://127.0.0.1:{ProxyServers.client_config_port}']
-            league.startDetached(clientPath, args)
+
+            args_list = ['--' + arg.strip() for arg in self.allTextRCArgs.toPlainText().split('--') if arg.strip()]
+            args_list += [f'--client-config-url=http://127.0.0.1:{ProxyServers.client_config_port}']
+            if '--launch-patchline' not in self.allTextRCArgs.toPlainText():
+                patchline = '--launch-patchline=' + ('pbe' if 'PBE' in selected_region else 'live')
+                args_list += [patchline]
+            print(f"Launched {clientPath} {args_list}")
+            league.startDetached(clientPath, args_list)
 
     @pyqtSlot()
     def on_actionExit_triggered(self):
@@ -593,8 +667,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
 
     @pyqtSlot()
     def on_actionAbout_triggered(self):
-        QMessageBox.information(self, "About LeagueClientDebugger",
-                                 "RTMP, XMPP, RMS, HTTP/S Debugger tool for League of Legends client <br> <a href='https://www.github.com/KebsCS'>GitHub</a>")
+        QMessageBox.about(self, "About LeagueClientDebugger",
+                                 "RTMP, XMPP, RMS, HTTP/S Debugger tool for League of Legends client <br> <a href='https://github.com/KebsCS/LeagueClientDebugger'>GitHub</a>")
 
     @pyqtSlot()
     def on_actionChoose_directory_triggered(self):
@@ -619,7 +693,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
 
     @pyqtSlot()
     def on_actionSave_all_requests_triggered(self):
-        with open(f'{self.saveDir}all_requests.txt', 'w', encoding="utf-8") as file:
+        current_time = datetime.datetime.now().strftime("%H-%M-%S")
+        with open(f'{self.saveDir}all_requests{current_time}.txt', 'w', encoding="utf-8") as file:
             for index in range(self.allList.count()):
                 item = self.allList.item(index)
                 if item is not None:
@@ -629,7 +704,13 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
 
     @pyqtSlot()
     def on_actionOptions_triggered(self):
+        stay_on_top = self.actionStay_on_top.isChecked()
+        if stay_on_top:
+            self.on_actionStay_on_top_triggered(False)
+
         self.options_dialog.exec_()
+        if stay_on_top:
+            self.on_actionStay_on_top_triggered(True)
 
 
     def add_item_to_all(self, list_widget, start):
@@ -640,6 +721,14 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
 
         if list_widget is self.xmppList:
             item.setIcon(self.icon_xmpp)
+
+            def pretty_xml(xml_string):
+                try:
+                    root = etree.fromstring(xml_string.encode("utf-8"))
+                    return etree.tostring(root, pretty_print=True).decode()
+                except etree.XMLSyntaxError:
+                    return xml_string
+            item.setData(256, pretty_xml(item.data(256)))
         elif list_widget is self.rtmpList:
             item.setIcon(self.icon_rtmp)
         elif list_widget is self.rmsList:
@@ -653,7 +742,12 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                 return
             item.setIcon(self.icon_lcu)
 
-        self.allList.addItem(item)
+        scrollbar = self.allList.verticalScrollBar()
+        if not scrollbar or scrollbar.value() == scrollbar.maximum():
+            self.allList.addItem(item)
+            self.allList.scrollToBottom()
+        else:
+            self.allList.addItem(item)
 
     @pyqtSlot()
     def on_allButtonClear_clicked(self):
@@ -663,79 +757,21 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
     def on_xmppButtonClear_clicked(self):
         self.xmppList.clear()
 
+    @pyqtSlot()
     def on_rtmpButtonClear_clicked(self):
         self.rtmpList.clear()
 
+    @pyqtSlot()
     def on_rmsButtonClear_clicked(self):
         self.rmsList.clear()
 
+    @pyqtSlot()
     def on_httpsButtonClear_clicked(self):
         self.httpsList.clear()
 
+    @pyqtSlot()
     def on_lcuButtonClear_clicked(self):
         self.lcuList.clear()
-
-    def scroll_func_all(self):
-        self.allList.scrollToBottom()
-
-    @pyqtSlot(bool)
-    def on_allScrollToBottom_toggled(self, checked):
-        if checked:
-            self.allList.model().rowsInserted.connect(self.scroll_func_all)
-        else:
-            self.allList.model().rowsInserted.disconnect(self.scroll_func_all)
-
-    def scroll_func_xmpp(self):
-        self.xmppList.scrollToBottom()
-
-    @pyqtSlot(bool)
-    def on_xmppScrollToBottom_toggled(self, checked):
-        if checked:
-            self.xmppList.model().rowsInserted.connect(self.scroll_func_xmpp)
-        else:
-            self.xmppList.model().rowsInserted.disconnect(self.scroll_func_xmpp)
-
-    def scroll_func_rtmp(self):
-        self.rtmpList.scrollToBottom()
-
-    @pyqtSlot(bool)
-    def on_rtmpScrollToBottom_toggled(self, checked):
-        if checked:
-            self.rtmpList.model().rowsInserted.connect(self.scroll_func_rtmp)
-        else:
-            self.rtmpList.model().rowsInserted.disconnect(self.scroll_func_rtmp)
-
-    def scroll_func_rms(self):
-        self.rmsList.scrollToBottom()
-
-    @pyqtSlot(bool)
-    def on_rmsScrollToBottom_toggled(self, checked):
-        if checked:
-            self.rmsList.model().rowsInserted.connect(self.scroll_func_rms)
-        else:
-            self.rmsList.model().rowsInserted.disconnect(self.scroll_func_rms)
-
-    def scroll_func_https(self):
-        self.httpsList.scrollToBottom()
-
-    @pyqtSlot(bool)
-    def on_httpsScrollToBottom_toggled(self, checked):
-        if checked:
-            self.httpsList.model().rowsInserted.connect(self.scroll_func_https)
-        else:
-            self.httpsList.model().rowsInserted.disconnect(self.scroll_func_https)
-
-
-    def scroll_func_lcu(self):
-        self.lcuList.scrollToBottom()
-
-    @pyqtSlot(bool)
-    def on_lcuScrollToBottom_toggled(self, checked):
-        if checked:
-            self.lcuList.model().rowsInserted.connect(self.scroll_func_lcu)
-        else:
-            self.lcuList.model().rowsInserted.disconnect(self.scroll_func_lcu)
-
 
     @pyqtSlot()
     def on_httpsFiddlerButton_clicked(self):
@@ -786,9 +822,6 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                         self.mitmTableWidget.item(row, 2).setText(rule["contains"])
                         self.mitmTableWidget.item(row, 3).setText(rule["changeto"])
 
-                # if "custom_xmpp" in data:
-                #     self.xmppCustomTextEdit.setText(data["custom_xmpp"])
-
                 if "fiddler_enabled" in data:
                     self.httpsFiddlerEnabled.setChecked(data["fiddler_enabled"])
 
@@ -816,6 +849,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                     self.rmsSplitter.restoreState(QByteArray.fromHex(data["rmsSplitter"].encode()))
                 if "httpsSplitter" in data:
                     self.httpsSplitter.restoreState(QByteArray.fromHex(data["httpsSplitter"].encode()))
+                if "lcuSplitter" in data:
+                    self.lcuSplitter.restoreState(QByteArray.fromHex(data["lcuSplitter"].encode()))
                 if "customSplitter" in data:
                     self.customSplitter.restoreState(QByteArray.fromHex(data["customSplitter"].encode()))
 
@@ -851,8 +886,27 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                 if "optionsIncludeLCU" in data:
                     UiObjects.optionsIncludeLCU.setChecked(data["optionsIncludeLCU"])
 
+                if "optionsIncludeJWTs" in data:
+                    UiObjects.optionsIncludeJWTs.setChecked(data["optionsIncludeJWTs"])
+
                 if "lcuEnabled" in data:
                     self.lcuEnabled.setChecked(data["lcuEnabled"])
+
+                if "allTextRCArgs" in data:
+                    self.allTextRCArgs.setPlainText(data["allTextRCArgs"])
+                else:
+                    self.allTextRCArgs.setPlainText("--allow-multiple-clients --launch-product=league_of_legends")
+
+                if "allTextLCArgs" in data:
+                    self.allTextLCArgs.setPlainText(data["allTextLCArgs"])
+                else:
+                    self.allTextLCArgs.setPlainText(
+                        "--no-rads --disable-self-update --locale={locale} --rga-lite "
+                        "--riotgamesapi-standalone --riotgamesapi-settings={settings-token} "
+                        "--riotclient-auth-token={remoting-auth-token} --riotclient-app-port={remoting-app-port}")
+
+                if "allCheckboxLC" in data:
+                    self.allCheckboxLC.setChecked(data["allCheckboxLC"])
 
                 self.on_httpsFiddlerButton_clicked()
 
@@ -882,8 +936,6 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                         "changeto": self.mitmTableWidget.item(row, 3).text()}
                 data["mitm"].append(rule)
 
-            # data["custom_xmpp"] = self.xmppCustomTextEdit.toPlainText()
-
             data["fiddler_enabled"] = self.httpsFiddlerEnabled.isChecked()
             data["fiddler_host"] = self.httpsFiddlerHost.toPlainText()
             data["fiddler_port"] = self.httpsFiddlerPort.toPlainText()
@@ -895,6 +947,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             data["rtmpSplitter"] = self.rtmpSplitter.saveState().data().hex()
             data["rmsSplitter"] = self.rmsSplitter.saveState().data().hex()
             data["httpsSplitter"] = self.httpsSplitter.saveState().data().hex()
+            data["lcuSplitter"] = self.lcuSplitter.saveState().data().hex()
             data["customSplitter"] = self.customSplitter.saveState().data().hex()
 
             data["customTableGeometry"] = self.customTable.saveGeometry().data().hex()
@@ -923,8 +976,13 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             data["optionsDisableVanguard"] = UiObjects.optionsDisableVanguard.isChecked()
             data["optionsEnableInject"] = UiObjects.optionsEnableInject.isChecked()
             data["optionsIncludeLCU"] = UiObjects.optionsIncludeLCU.isChecked()
+            data["optionsIncludeJWTs"] = UiObjects.optionsIncludeJWTs.isChecked()
 
             data["lcuEnabled"] = self.lcuEnabled.isChecked()
+
+            data["allTextRCArgs"] = self.allTextRCArgs.toPlainText()
+            data["allTextLCArgs"] = self.allTextLCArgs.toPlainText()
+            data["allCheckboxLC"] = self.allCheckboxLC.isChecked()
 
 
             configFile.seek(0)
@@ -932,6 +990,10 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             configFile.truncate()
 
     #endregion
+
+    def closeEvent(self, event):
+       self.SaveConfig()
+       event.accept()
 
 if __name__ == "__main__":
     # print silent QT errors

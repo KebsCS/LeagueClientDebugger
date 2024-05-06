@@ -21,15 +21,9 @@ JSONEncoder.default = _default
 
 
 def typed_object_repr(self):
-    def format_datetime(dt):
-        # if isinstance(dt, datetime.datetime):
-        #     return dt.strftime('%Y-%m-%dT%H:%M:%S.%f')
-        # else:
-        return dt
-
     self["__class"] = str(self.alias)
     for key, value in self.items():
-        self[key] = format_datetime(value)
+        self[key] = value
 
     return dict.__repr__(self)
 
@@ -59,13 +53,7 @@ pyamf.UndefinedType.to_json = undefined_type_to_json
 
 
 def abstract_message_to_json(self):
-    def format_datetime(dt):
-        # if isinstance(dt, datetime.datetime):
-        #     return dt.strftime('%Y-%m-%dT%H:%M:%S.%f')
-        # else:
-        return dt
-
-    attrs = {k: format_datetime(getattr(self, k)) for k in self.__dict__}
+    attrs = {k: getattr(self, k) for k in self.__dict__}
     attrs['__class'] = "flex.messaging.messages." + self.__class__.__name__
     return attrs
 
@@ -88,9 +76,8 @@ def log_message(parser, is_outgoing):
     text = f"[{current_time}] "
     text += "[OUT] " if is_outgoing else "[IN]     "
 
+    item = QListWidgetItem()
     if parser.current_message_parsed:
-        item = QListWidgetItem()
-
         json_msg = json.loads(json.dumps(current_message))
         invoke_id = json_msg.get("invokeId", "") or ""
         text += f"{invoke_id} "
@@ -104,12 +91,15 @@ def log_message(parser, is_outgoing):
 
         item.setText(text)
         item.setData(256, json.dumps(current_message, indent=4))
-
-        UiObjects.rtmpList.addItem(item)
     else:
-        item = QListWidgetItem()
         item.setText(text + "handshake" if isinstance(parser.current_message, bytes) else "")
         item.setData(256, str(parser.current_message))
+
+    scrollbar = UiObjects.rtmpList.verticalScrollBar()
+    if not scrollbar or scrollbar.value() == scrollbar.maximum():
+        UiObjects.rtmpList.addItem(item)
+        UiObjects.rtmpList.scrollToBottom()
+    else:
         UiObjects.rtmpList.addItem(item)
 
 
@@ -129,6 +119,29 @@ class RtmpParser:
 
         self.current_message = b''  # currently parsed message, send it after parsing - when feed_data returns true
         self.current_message_parsed = dict()
+
+    # todo implement this
+    def read_header(self):
+        first_byte = self.decoder.stream.read(1)
+        chunk_header_type = (first_byte >> 6) & 0b11    # first 2 bits
+        chunk_stream_id = first_byte & 0b00111111   #  bits 0-5 (least significant) represent the chunk stream ID
+
+        if chunk_header_type == 0x00:   # chunk header type 0
+            timestamp = self.decoder.stream.read(3)
+            message_length = self.decoder.stream.read_24bit_uint()
+            message_type_id = self.decoder.stream.read(1)
+            message_stream_id = self.decoder.stream.read(4)
+        elif chunk_header_type == 0x01: # type 1
+            timestamp_delta = self.decoder.stream.read(3)
+            message_length = self.decoder.stream.read_24bit_uint()
+            message_type_id = self.decoder.stream.read(1)
+        elif chunk_header_type == 0x02: # type 2
+            timestamp_delta = self.decoder.stream.read(3)
+        elif chunk_header_type == 0x03: # type 3
+            pass    # no message header
+        else:
+            raise Exception("[RTMP] Unknown chunk header type")
+
 
     # returns true when succeeded and the self.current_message bytes can be sent to client/server
     def feed_data(self, data):

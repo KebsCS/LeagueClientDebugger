@@ -55,14 +55,14 @@ __declspec(safebuffers)void WINAPI InitThread(HMODULE hModule) noexcept
 
 	MH_Initialize();
 
-	uintptr_t SSL_CTX_set_verify_addr = FindPattern(modBase, "E8 ?? ?? ?? ?? E8 ?? ?? ?? ?? 84 C0 74 10") + 0x0;
+	uintptr_t SSL_CTX_set_verify_addr = FindPattern(modBase, "89 91 58 01 00 00 4C 89 81 88 01 00 00") + 0x0;
 	if (!SSL_CTX_set_verify_addr)
 	{
 		printf("SSL_CTX_set_verify_addr not found");
 	}
 	MH_CreateHook((LPVOID)SSL_CTX_set_verify_addr, SSL_CTX_set_verify_hook, reinterpret_cast<void**>(&SSL_CTX_set_verify_original));
 
-	uintptr_t X509_verify_cert_addr = FindPattern(modBase, "E8 ?? ?? ?? ?? 85 C0 7F 1A 41 F6 C5 08") + 0x0;
+	uintptr_t X509_verify_cert_addr = FindPattern(modBase, "48 89 5C 24 08 57 B8 30 00 00 00 E8 ?? ?? ?? ?? 48 2B E0 48 8B B9 E8 00 00 00") + 0x0;
 	if (!X509_verify_cert_addr)
 	{
 		printf("X509_verify_cert_addr not found");

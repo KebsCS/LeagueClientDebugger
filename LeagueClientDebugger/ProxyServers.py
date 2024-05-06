@@ -29,7 +29,7 @@ class ProxyServers:
     auth_port = 0
     authenticator_port = 0
     rms_port = 0
-
+    rtmp_port = 0
 
     @staticmethod
     def assign_ports():

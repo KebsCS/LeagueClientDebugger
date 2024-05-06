@@ -3,6 +3,7 @@ import asyncio, websockets, gzip, re, datetime
 from ProxyServers import ProxyServers
 from UiObjects import *
 
+
 class RmsProxy:
     global_ws = None
     global_target_ws = None
@@ -52,7 +53,6 @@ class RmsProxy:
                 print("[RMS] Connection closed ", e)
                 UiObjects.add_disconnected_item(UiObjects.rmsList)
 
-
         async with websockets.connect(target_hostname + path, extra_headers=req_headers) as target_ws:
             RmsProxy.global_ws = ws
             RmsProxy.global_target_ws = target_ws
@@ -81,8 +81,14 @@ class RmsProxy:
 
         item = QListWidgetItem()
         item.setText(item_text)
-        item.setData(256, json.dumps(json_message, indent=4))
-        UiObjects.rmsList.addItem(item)
+        item.setData(256, json_message)
+
+        scrollbar = UiObjects.rmsList.verticalScrollBar()
+        if not scrollbar or scrollbar.value() == scrollbar.maximum():
+            UiObjects.rmsList.addItem(item)
+            UiObjects.rmsList.scrollToBottom()
+        else:
+            UiObjects.rmsList.addItem(item)
 
 
     async def start_proxy(self):

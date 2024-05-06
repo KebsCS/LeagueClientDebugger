@@ -1,21 +1,27 @@
-from PyQt5.QtWidgets import QMessageBox, QFileDialog, QListWidgetItem, QTableWidgetItem, QComboBox, QStyleFactory, QCheckBox
+from PyQt5.QtWidgets import QMessageBox, QFileDialog, QListWidget, QListWidgetItem, QTableWidgetItem, QComboBox, QStyleFactory, QCheckBox
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QIcon
 import json
 
 
 class UiObjects:
-    xmppList = QListWidgetItem()
-    rtmpList = QListWidgetItem()
-    rmsList = QListWidgetItem()
-    httpsList = QListWidgetItem()
-    lcuList = QListWidgetItem()
+    allList = None
+    xmppList = None
+    rtmpList = None
+    rmsList = None
+    httpsList = None
+    lcuList = None
 
-    mitmTableWidget = QTableWidgetItem()
+    mitmTableWidget = None
+
+    allCheckboxLC = None
+    allTextLCArgs = None
 
     # Options
-    optionsDisableVanguard = QCheckBox
-    optionsEnableInject = QCheckBox
-    optionsIncludeLCU = QCheckBox
+    optionsDisableVanguard = None
+    optionsEnableInject = None
+    optionsIncludeLCU = None
+    optionsIncludeJWTs = None
 
     @staticmethod
     def add_connected_item(list_widget: QListWidgetItem, extra_info="", extra_data=" "):

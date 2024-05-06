@@ -1,10 +1,8 @@
 import asyncio, ssl, re, datetime
-from lxml import etree
-
 from UiObjects import *
 
-class ProtocolFromServer(asyncio.Protocol):
 
+class ProtocolFromServer(asyncio.Protocol):
     def __init__(self, on_con_lost, league_client, first_req):
         self.on_con_lost = on_con_lost
 
@@ -44,6 +42,7 @@ class ProtocolFromServer(asyncio.Protocol):
 class ChatProxy:
     global_league_client = None
     global_real_server = None
+
     # Incoming from client
     class ProtocolFromClient(asyncio.Protocol):
 
@@ -140,15 +139,15 @@ class ChatProxy:
 
         item.setText(text)
 
-        def pretty_xml(xml_string):
-            try:
-                root = etree.fromstring(xml_string.encode("utf-8"))
-                return etree.tostring(root, pretty_print=True).decode()
-            except etree.XMLSyntaxError:
-                return xml_string
+        item.setData(256, message)
 
-        item.setData(256, pretty_xml(message))
-        UiObjects.xmppList.addItem(item)
+        scrollbar = UiObjects.xmppList.verticalScrollBar()
+        if not scrollbar or scrollbar.value() == scrollbar.maximum():
+            UiObjects.xmppList.addItem(item)
+            UiObjects.xmppList.scrollToBottom()
+        else:
+            UiObjects.xmppList.addItem(item)
+
         return message
 
     async def start_client_proxy(self, proxy_host, proxy_port, real_host, real_port):
