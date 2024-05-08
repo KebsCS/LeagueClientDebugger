@@ -699,7 +699,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                 item = self.allList.item(index)
                 if item is not None:
                     file.write(item.text() + '\r\n')
-                    file.write(item.data(256) + '\r\n\r\n')
+                    file.write(item.data(256).replace('\r\n', '\n') + '\r\n\r\n')
 
 
     @pyqtSlot()
@@ -793,7 +793,10 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         with open(self.configFileName, mode) as configFile:
             try:
                 data = json.load(configFile)
+            except (io.UnsupportedOperation, json.decoder.JSONDecodeError):
+                data = {}
 
+            try:
                 if "geometry" in data:
                     self.restoreGeometry(QByteArray.fromHex(data["geometry"].encode()))
 
@@ -910,7 +913,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
 
                 self.on_httpsFiddlerButton_clicked()
 
-            except (json.decoder.JSONDecodeError, KeyError, io.UnsupportedOperation):
+            except KeyError as e:
+                print("Config load error ", e)
                 pass
 
     def SaveConfig(self):

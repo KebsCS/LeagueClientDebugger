@@ -51,7 +51,7 @@ class RmsProxy:
                     await ws.send(message)
             except websockets.ConnectionClosed as e:
                 print("[RMS] Connection closed ", e)
-                UiObjects.add_disconnected_item(UiObjects.rmsList)
+                UiObjects.add_disconnected_item(UiObjects.rmsList, str(ws.useragent))
 
         async with websockets.connect(target_hostname + path, extra_headers=req_headers) as target_ws:
             RmsProxy.global_ws = ws
