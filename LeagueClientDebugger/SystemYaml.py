@@ -19,21 +19,29 @@ class SystemYaml:
         self.path = 'C:\\Riot Games\\League of Legends\\system.yaml'
         self.path_pbe = 'C:\\Riot Games\\League of Legends (PBE)\\system.yaml'
 
-        with open(os.getenv('PROGRAMDATA') +
-                  "/Riot Games/Metadata/league_of_legends.live/league_of_legends.live.product_settings.yaml", 'r') as file:
-            read_data = yaml.YAML(typ='rt').load(file)
-            self.path = read_data['product_install_full_path'] + "\\system.yaml"
+        live_settings = os.getenv('PROGRAMDATA') + \
+                        "/Riot Games/Metadata/league_of_legends.live/league_of_legends.live.product_settings.yaml"
 
-        with open(os.getenv('PROGRAMDATA') +
-                  "/Riot Games/Metadata/league_of_legends.pbe/league_of_legends.pbe.product_settings.yaml", 'r') as file:
-            read_data = yaml.YAML(typ='rt').load(file)
-            self.path_pbe = read_data['product_install_full_path'] + "\\system.yaml"
+        if os.path.exists(live_settings):
+            with open(live_settings, 'r') as file:
+                read_data = yaml.YAML(typ='rt').load(file)
+                self.path = read_data['product_install_full_path'] + "\\system.yaml"
+
+        pbe_settings = os.getenv('PROGRAMDATA') + \
+                       "/Riot Games/Metadata/league_of_legends.pbe/league_of_legends.pbe.product_settings.yaml"
+
+        if os.path.exists(pbe_settings):
+            with open(pbe_settings, 'r') as file:
+                read_data = yaml.YAML(typ='rt').load(file)
+                self.path_pbe = read_data['product_install_full_path'] + "\\system.yaml"
 
     def read(self):
         self._read(self.path)
         self._read(self.path_pbe)
 
     def _read(self, path: str):
+        if not os.path.exists(path):
+            return
         with open(path, 'r') as fp:
             read_data = yaml.YAML(typ='rt').load(fp)
 
@@ -66,6 +74,8 @@ class SystemYaml:
         self._edit(self.path_pbe)
 
     def _edit(self, path: str):
+        if not os.path.exists(path):
+            return
         read_data = None
         with open(path, 'r') as fp:
             read_data = yaml.YAML(typ='rt').load(fp)

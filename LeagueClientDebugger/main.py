@@ -668,7 +668,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
     @pyqtSlot()
     def on_actionAbout_triggered(self):
         QMessageBox.about(self, "About LeagueClientDebugger",
-                                 "RTMP, XMPP, RMS, HTTP/S Debugger tool for League of Legends client <br> <a href='https://github.com/KebsCS/LeagueClientDebugger'>GitHub</a>")
+                                 "RTMP, XMPP, RMS, HTTP/S Debugger tool for League of Legends client <br> <a href='https://github.com/KebsCS/LeagueClientDebugger'>GitHub</a>"+
+                          "     <a href='https://discord.gg/qMmPBFpj2n'>Discord</a>")
 
     @pyqtSlot()
     def on_actionChoose_directory_triggered(self):
