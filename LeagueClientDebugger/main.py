@@ -74,6 +74,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         dialog_ui.optionsEnableInject.stateChanged.connect(lambda state: self.allButtonInject.show() if state == Qt.Checked else self.allButtonInject.hide())
         UiObjects.optionsIncludeLCU = dialog_ui.optionsIncludeLCU
         UiObjects.optionsIncludeJWTs = dialog_ui.optionsIncludeJWTs
+        UiObjects.optionsDisableAuth = dialog_ui.optionsDisableAuth
 
         self.icon_xmpp = QIcon("images/xmpp.png")
         self.tabWidget.setTabIcon(1, self.icon_xmpp)
@@ -632,8 +633,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
 
             self.start_proxy("https://playerpreferences.riotgames.com", ProxyServers.playerpreferences_port)
             self.start_proxy("https://riot-geo.pas.si.riotgames.com", ProxyServers.geo_port)
-            self.start_proxy("https://auth.riotgames.com", ProxyServers.auth_port)
-            self.start_proxy("https://authenticate.riotgames.com", ProxyServers.authenticator_port)
+            if not UiObjects.optionsDisableAuth.isChecked():
+                self.start_proxy("https://auth.riotgames.com", ProxyServers.auth_port)
+                self.start_proxy("https://authenticate.riotgames.com", ProxyServers.authenticator_port)
             self.start_proxy("https://api.account.riotgames.com", ProxyServers.accounts_port)
             self.start_proxy("https://content.publishing.riotgames.com",
                              ProxyServers.publishing_content_port)
@@ -893,6 +895,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                 if "optionsIncludeJWTs" in data:
                     UiObjects.optionsIncludeJWTs.setChecked(data["optionsIncludeJWTs"])
 
+                if "optionsDisableAuth" in data:
+                    UiObjects.optionsDisableAuth.setChecked(data["optionsDisableAuth"])
+
                 if "lcuEnabled" in data:
                     self.lcuEnabled.setChecked(data["lcuEnabled"])
 
@@ -982,6 +987,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             data["optionsEnableInject"] = UiObjects.optionsEnableInject.isChecked()
             data["optionsIncludeLCU"] = UiObjects.optionsIncludeLCU.isChecked()
             data["optionsIncludeJWTs"] = UiObjects.optionsIncludeJWTs.isChecked()
+            data["optionsDisableAuth"] = UiObjects.optionsDisableAuth.isChecked()
 
             data["lcuEnabled"] = self.lcuEnabled.isChecked()
 

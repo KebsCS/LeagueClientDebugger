@@ -32,6 +32,9 @@ class Ui_Dialog(object):
         self.optionsIncludeJWTs = QtWidgets.QCheckBox(Dialog)
         self.optionsIncludeJWTs.setObjectName("optionsIncludeJWTs")
         self.verticalLayout_3.addWidget(self.optionsIncludeJWTs)
+        self.optionsDisableAuth = QtWidgets.QCheckBox(Dialog)
+        self.optionsDisableAuth.setObjectName("optionsDisableAuth")
+        self.verticalLayout_3.addWidget(self.optionsDisableAuth)
         spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
         self.verticalLayout_3.addItem(spacerItem)
         self.horizontalLayout.addLayout(self.verticalLayout_3)
@@ -51,6 +54,8 @@ class Ui_Dialog(object):
         self.optionsEnableInject.setText(_translate("Dialog", "Enable debug dll injecting"))
         self.optionsIncludeJWTs.setText(_translate("Dialog", "Include decoded JWTs in search\n"
 "(Currently only in Start tab)"))
+        self.optionsDisableAuth.setText(_translate("Dialog", "Disable auth proxy\n"
+"(When you have problems with cloudflare 403)"))
 
 
 if __name__ == "__main__":

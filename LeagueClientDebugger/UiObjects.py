@@ -22,6 +22,7 @@ class UiObjects:
     optionsEnableInject = None
     optionsIncludeLCU = None
     optionsIncludeJWTs = None
+    optionsDisableAuth = None
 
     @staticmethod
     def add_connected_item(list_widget: QListWidgetItem, extra_info="", extra_data=" "):

@@ -33,6 +33,16 @@ class SSLAdapter(HTTPAdapter):
         k['ssl_context'] = c
         return super(SSLAdapter, self).init_poolmanager(*a, **k)
 
+    def proxy_manager_for(self, *a: Any, **k: Any):
+        c = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+        c.check_hostname = False
+        c.set_ciphers(':'.join(CIPHERS))
+        c.minimum_version = ssl.TLSVersion.TLSv1_2
+        c.verify_mode = ssl.CERT_NONE
+
+        k['ssl_context'] = c
+        return super(SSLAdapter, self).proxy_manager_for(*a, **k)
+
 
 class Request:
     def __init__(self):

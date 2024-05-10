@@ -178,9 +178,9 @@ class ConfigProxy:
 
                         if "launchable_on_update_fail" in node:
                             node["launchable_on_update_fail"] = True
-
-            replace_value("keystone.rso_auth.url", f"http://localhost:{ProxyServers.auth_port}")
-            replace_value("keystone.rso-authenticator.service_url", f"http://localhost:{ProxyServers.authenticator_port}")
+            if not UiObjects.optionsDisableAuth.isChecked():
+                replace_value("keystone.rso_auth.url", f"http://localhost:{ProxyServers.auth_port}")
+                replace_value("keystone.rso-authenticator.service_url", f"http://localhost:{ProxyServers.authenticator_port}")
 
             for key in config.keys():
                 if ".player_platform_edge.url" in key:
