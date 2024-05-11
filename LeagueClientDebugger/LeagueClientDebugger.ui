@@ -1768,6 +1768,11 @@
                   <string>RMS</string>
                  </property>
                 </item>
+                <item>
+                 <property name="text">
+                  <string>LCU</string>
+                 </property>
+                </item>
                </widget>
               </item>
               <item>

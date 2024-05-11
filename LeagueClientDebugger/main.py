@@ -1,6 +1,6 @@
 from LeagueClientDebugger import Ui_LeagueClientDebuggerClass
 from DebuggerOptions import Ui_Dialog
-import sys, json, time, os, io, asyncio, pymem, requests, gzip, re, base64, datetime
+import sys, json, time, os, io, asyncio, pymem, requests, gzip, re, base64, datetime, psutil
 from lxml import etree
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import pyqtSlot, pyqtSignal, Qt, QEvent, QByteArray
@@ -16,7 +16,7 @@ from SystemYaml import SystemYaml
 from ProxyServers import ProxyServers
 from UiObjects import UiObjects
 from RmsProxy import RmsProxy
-from LcuWebsocket import LcuWebsocket
+from LcuWebsocket import LcuWebsocket, LCUConnection
 
 # import logging
 # logging.getLogger().setLevel(logging.WARNING)
@@ -142,6 +142,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         SystemYaml().edit()
 
         self.proxies_started = False
+        self.custom_process = None
 
     def show_hide_args(self):
         if self.allTextRCArgs.isHidden():
@@ -281,14 +282,19 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
 
     def on_customComboProtocol_currentTextChanged(self, text):
         #todo maybe separate textedits for every protocol
-        if text != "HTTP/S":
-            self.customHttpUrl.hide()
-            self.customHttpMethod.hide()
-            self.customHttpHeaders.hide()
-        else:
+        if text == "HTTP/S":
             self.customHttpUrl.show()
             self.customHttpMethod.show()
             self.customHttpHeaders.show()
+        elif text == "LCU":
+            self.customHttpUrl.show()
+            self.customHttpMethod.show()
+            self.customHttpHeaders.hide()
+        else:
+            self.customHttpUrl.hide()
+            self.customHttpMethod.hide()
+            self.customHttpHeaders.hide()
+
 
     def on_custom_set_clicked(self):
         sender = self.sender()
@@ -299,11 +305,12 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                 protocol = self.customTable.item(row, 1).text()
                 self.customComboProtocol.setCurrentText(protocol)
                 self.customComboDetination.setCurrentText(self.customTable.item(row, 2).text())
-                if protocol == "HTTP/S":
+                if protocol == "HTTP/S" or protocol == "LCU":
                     item = self.customTable.item(row, 3)
                     self.customHttpMethod.setText(item.data(256))
                     self.customHttpUrl.setText(item.data(257))
-                    self.customHttpHeaders.setText(item.data(258))
+                    if protocol != "LCU":
+                        self.customHttpHeaders.setText(item.data(258))
                     self.customText.setText(item.data(259))
                 else:
                     self.customText.setText(self.customTable.item(row, 3).text())
@@ -329,12 +336,13 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         protocol = self.customComboProtocol.currentText()
         self.customTable.setItem(rowCount, 1, QTableWidgetItem(protocol))
         self.customTable.setItem(rowCount, 2, QTableWidgetItem(self.customComboDetination.currentText()))
-        if protocol == "HTTP/S":
+        if protocol == "HTTP/S" or protocol == "LCU":
             item = QTableWidgetItem()
             item.setText(self.customHttpMethod.toPlainText() + " " + self.customHttpUrl.toPlainText())
             item.setData(256, self.customHttpMethod.toPlainText())
             item.setData(257, self.customHttpUrl.toPlainText())
-            item.setData(258, self.customHttpHeaders.toPlainText())
+            if protocol != "LCU":
+                item.setData(258, self.customHttpHeaders.toPlainText())
             item.setData(259, self.customText.toPlainText())
             self.customTable.setItem(rowCount, 3, item)
         else:
@@ -387,6 +395,38 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             elif protocol == "RTMP":
                 #todo
                 QMessageBox.about(self, "Info", "RTMP custom requests are not ready yet")
+            elif protocol == "LCU":
+                # todo get process async on lc launch
+                if not self.custom_process:
+                    self.custom_process = next(LCUConnection.return_ux_process(), None)
+                if self.custom_process:
+                    try:
+                        args = LCUConnection.process_args(self.custom_process)
+
+
+                        headers = {
+                            'Authorization': 'Basic ' + base64.b64encode(b'riot:' + args.lcu_token.encode()).decode(),
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.36 '
+                                          '(KHTML, like Gecko) LeagueOfLegendsClient/14.9.581.9966 (CEF 91) Safari/537.36'
+                        }
+
+                        url = self.customHttpUrl.toPlainText().strip()
+
+                        if not url.startswith("http://") and not url.startswith("https://"):
+                            url = "https://127.0.0.1:" + str(args.lcu_port) + url
+                        elif url.startswith("https://127.0.0.1") and ":" not in url:
+                            url = url[:len("https://127.0.0.1")] + ":" + str(args.lcu_port) + url[len("https://127.0.0.1"):]
+
+                        response = requests.request(self.customHttpMethod.toPlainText().strip(),
+                                                    url,
+                                                    headers=headers, data=self.customText.toPlainText(),
+                                                    proxies=ProxyServers.fiddler_proxies, verify=False)
+
+                        HttpProxy.log_message(response)
+                    except psutil.NoSuchProcess:
+                        self.custom_process = None
 
         except Exception as e:
             print("Failed to send custom request ", e)
@@ -874,11 +914,13 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                         self.customTable.item(row, 1).setText(req["protocol"])
                         self.customTable.item(row, 2).setText(req["destination"])
                         self.customTable.item(row, 3).setText(req["text"])
-                        if req["protocol"] == "HTTP/S":
+                        protocol = req["protocol"]
+                        if protocol == "HTTP/S" or protocol == "LCU":
                             item = self.customTable.item(row, 3)
-                            item.setData(256, req["url"])
-                            item.setData(257, req["method"])
-                            item.setData(258, req["headers"])
+                            item.setData(256, req["method"])
+                            item.setData(257, req["url"])
+                            if protocol != "LCU":
+                                item.setData(258, req["headers"])
                             item.setData(259, req["body"])
 
                 if "optionsDisableVanguard" in data:
@@ -975,11 +1017,12 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                     "destination": self.customTable.item(row, 2).text(),
                     "text": self.customTable.item(row, 3).text()
                 }
-                if protocol == "HTTP/S":
+                if protocol == "HTTP/S" or protocol == "LCU":
                     item = self.customTable.item(row, 3)
                     req["method"] = item.data(256)
                     req["url"] = item.data(257)
-                    req["headers"] = item.data(258)
+                    if protocol != "LCU":
+                        req["headers"] = item.data(258)
                     req["body"] = item.data(259)
                 data["customTable"].append(req)
 

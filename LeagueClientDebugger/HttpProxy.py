@@ -194,6 +194,19 @@ class HttpProxy:
                 response._content = response.text.replace("https://auth.riotgames.com",
                                                           f"http://localhost:{ProxyServers.auth_port}").encode()
 
+            # CORS fix, storefront required it
+            if response.request.method.upper() == "OPTIONS":# and "storefront" in response.url:
+                response.raw.status = 200
+                response.status_code = 200
+
+                headers_to_modify = ['access-control-allow-origin', 'access-control-allow-methods',
+                                     'access-control-allow-headers', 'access-control-expose-headers']
+
+                for headers_dict in [response.headers, response.raw.headers]:
+                    for header in headers_dict:
+                        if header.lower() in headers_to_modify:
+                            headers_dict[header] = '*'
+
             return response
 
         def send_response(self, response: bytes):
