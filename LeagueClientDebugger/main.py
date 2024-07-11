@@ -29,6 +29,7 @@ from LcuWebsocket import LcuWebsocket, LCUConnection
 os.environ['no_proxy'] = '*'
 
 JWT_PATTERN = r'eyJ[A-Za-z0-9=_-]+(?:\.[A-Za-z0-9=_-]+){2,}'
+GZIP_PATTERN = r'H4sIA[A-Za-z0-9/+=]+' # todo decode rtmp payload button
 
 #todo decode jwts in all tabs
 #todo add auto inject
@@ -691,7 +692,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         if self.lcuEnabled.isChecked():
             self.start_lcu_ws()
 
-        with open(os.getenv('PROGRAMDATA') + "/Riot Games/RiotClientInstalls.json", 'r') as file: # RiotClientServices.exe
+        with open(os.getenv('PROGRAMDATA') + "/Riot Games/RiotClientInstalls.json", 'r', encoding='utf-8') as file: # RiotClientServices.exe
             clientPath = json.load(file)["rc_default"]
             league = QProcess(None)
 
@@ -742,7 +743,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                 item = self.allList.item(index)
                 if item is not None:
                     file.write(item.text() + '\r\n')
-                    file.write(item.data(256).replace('\r\n', '\n') + '\r\n\r\n')
+                    data = item.data(256)
+                    data = json.dumps(data, indent=4) if isinstance(data, dict) else data
+                    file.write(data.replace('\r\n', '\n') + '\r\n\r\n')
 
 
     @pyqtSlot()
@@ -833,7 +836,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
     #region Config
     def LoadConfig(self):
         mode = 'r' if os.path.exists(self.configFileName) else 'w'
-        with open(self.configFileName, mode) as configFile:
+        with open(self.configFileName, mode, encoding='utf-8') as configFile:
             try:
                 data = json.load(configFile)
             except (io.UnsupportedOperation, json.decoder.JSONDecodeError):
@@ -966,7 +969,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                 pass
 
     def SaveConfig(self):
-        with open(self.configFileName, 'r+') as configFile:
+        with open(self.configFileName, 'r+', encoding='utf-8') as configFile:
             data = json.load(configFile) if os.stat(self.configFileName).st_size != 0 else {}
 
             data["geometry"] = self.saveGeometry().data().hex()

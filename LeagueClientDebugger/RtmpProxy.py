@@ -1,84 +1,37 @@
-import asyncio, ssl, pyamf, datetime
-import pyamf.flex
-import pyamf.amf0
-from pyamf.flex import messaging
+import asyncio, ssl, copy, gzip, base64, datetime
 from UiObjects import *
-
-from json import JSONEncoder
-
-def _default(self, obj):
-    if isinstance(obj, datetime.datetime):
-        return obj.strftime('%Y-%m-%dT%H:%M:%S.%f')
-    return getattr(obj.__class__, "to_json", _default.default)(obj)
-
-_default.default = JSONEncoder().default
-JSONEncoder.default = _default
-
-# League client is connected to ProtocolFromClient proxy server
-# League Client Messages -> ProtocolFromClient -> parser -> Sends to Riot server
-# ProtocolFromServer is a client connected to riot server, it receives messages and sends them to real league client
-# Riot Server Messages -> ProtocolFromServer -> parser -> Sends to League client
+from rtmp.ByteStreamReader import ByteStreamReader
+from rtmp.Amf0 import Amf0Decoder, Amf0Encoder, Amf0Amf3
 
 
-def typed_object_repr(self):
-    self["__class"] = str(self.alias)
-    for key, value in self.items():
-        self[key] = value
+class CustomJSONEncoder(json.JSONEncoder):
+    def _convert_to_json(self, obj):
+        if hasattr(obj, 'to_json'):
+            return self._convert_to_json(obj.to_json())
+        elif isinstance(obj, dict):
+            return {key: self._convert_to_json(value) for key, value in obj.items()}
+        elif isinstance(obj, list):
+            return [self._convert_to_json(item) for item in obj]
+        else:
+            return obj
 
-    return dict.__repr__(self)
+    def default(self, obj):
+        return super().default(self._convert_to_json(obj))
 
-pyamf.TypedObject.__repr__ = typed_object_repr
-
-def typed_object_init(self, alias):
-    dict.__init__(self)
-
-    self.alias = alias
-    self["__class"] = alias
-
-pyamf.TypedObject.__init__ = typed_object_init
-
-# flex.messaging.io.ArrayCollection crashes
-pyamf.unregister_class("flex.messaging.io.ArrayCollection")
+    def encode(self, obj):
+        return super(CustomJSONEncoder, self).encode(self._convert_to_json(obj))
 
 
-def undefined_type_repr(self):
-    return "'AMF3_UNDEFINED'"
-
-def undefined_type_to_json(self):
-    return "AMF3_UNDEFINED"
-
-
-pyamf.UndefinedType.__repr__ = undefined_type_repr
-pyamf.UndefinedType.to_json = undefined_type_to_json
-
-
-def abstract_message_to_json(self):
-    attrs = {k: getattr(self, k) for k in self.__dict__}
-    attrs['__class'] = "flex.messaging.messages." + self.__class__.__name__
-    return attrs
-
-
-def abstract_message_repr(self):
-    return repr(abstract_message_to_json(self))
-
-
-pyamf.flex.messaging.AbstractMessage.__repr__ = abstract_message_repr
-pyamf.flex.messaging.AbstractMessage.to_json = abstract_message_to_json
-
-
-def log_message(parser, is_outgoing):
-    current_message = parser.current_message_parsed if parser.current_message_parsed else str(
-        parser.current_message)
-
-    #print('[RTMP] ' + ('>' if is_outgoing else '<') + " " + str(parser.current_message))
+def log_message(message, is_outgoing):
+    #print('[RTMP] ' + ('>' if is_outgoing else '<') + " " + str(message))
 
     current_time = datetime.datetime.now().strftime("%H:%M:%S")
     text = f"[{current_time}] "
     text += "[OUT] " if is_outgoing else "[IN]     "
 
     item = QListWidgetItem()
-    if parser.current_message_parsed:
-        json_msg = json.loads(json.dumps(current_message))
+    if isinstance(message, dict):
+        json_msg = json.loads(json.dumps(message, cls=CustomJSONEncoder))
         invoke_id = json_msg.get("invokeId", "") or ""
         text += f"{invoke_id} "
 
@@ -90,10 +43,10 @@ def log_message(parser, is_outgoing):
             text += f"{messaging} {destination} {operation}"
 
         item.setText(text)
-        item.setData(256, json.dumps(current_message, indent=4))
+        item.setData(256, json.dumps(json_msg, indent=4))
     else:
-        item.setText(text + "handshake" if isinstance(parser.current_message, bytes) else "")
-        item.setData(256, str(parser.current_message))
+        item.setText(text + "handshake" if isinstance(message, bytes) else "")
+        item.setData(256, str(message))
 
     scrollbar = UiObjects.rtmpList.verticalScrollBar()
     if not scrollbar or scrollbar.value() == scrollbar.maximum():
@@ -103,130 +56,209 @@ def log_message(parser, is_outgoing):
         UiObjects.rtmpList.addItem(item)
 
 
+class RTMPHeader:
+    first_byte = None
+    chunk_header_type = None
+    chunk_stream_id = None
+
+    timestamp = None
+    message_length = 0
+    message_type_id = None
+    message_stream_id = None
+
+
+class RtmpPacket:
+    def __init__(self, header=RTMPHeader(), buffer=b'', length=0):
+        self.header = header
+        self.buffer = buffer
+        self.length = length
+
+
 class RtmpParser:
     CHUNK_SIZE = 128
+    handshake_counter = 0
 
-    counter = 0
+    unfinished_packet = None
 
-    def __init__(self):
-        self.stream = pyamf.util.BufferedByteStream()
-        self.decoder = pyamf.amf0.Decoder(stream=self.stream)
+    def __init__(self, parent):
+        self.parent = parent
 
-        self.received_new_message = True
-        self.packet_length = 0
+        self.stream = ByteStreamReader()
+        self.packets = dict()
 
-        self.all_data = b''  # all data that was received and not parsed yet
+    def read_header(self) -> RTMPHeader:
+        header = RTMPHeader()
+        header.first_byte = self.stream.read_uchar()
+        header.chunk_header_type = (header.first_byte >> 6) & 0b11    # first 2 bits
+        header.chunk_stream_id = header.first_byte & 0b00111111   #  bits 0-5 (least significant) represent the chunk stream ID
 
-        self.current_message = b''  # currently parsed message, send it after parsing - when feed_data returns true
-        self.current_message_parsed = dict()
-
-    # todo implement this
-    def read_header(self):
-        first_byte = self.decoder.stream.read(1)
-        chunk_header_type = (first_byte >> 6) & 0b11    # first 2 bits
-        chunk_stream_id = first_byte & 0b00111111   #  bits 0-5 (least significant) represent the chunk stream ID
-
-        if chunk_header_type == 0x00:   # chunk header type 0
-            timestamp = self.decoder.stream.read(3)
-            message_length = self.decoder.stream.read_24bit_uint()
-            message_type_id = self.decoder.stream.read(1)
-            message_stream_id = self.decoder.stream.read(4)
-        elif chunk_header_type == 0x01: # type 1
-            timestamp_delta = self.decoder.stream.read(3)
-            message_length = self.decoder.stream.read_24bit_uint()
-            message_type_id = self.decoder.stream.read(1)
-        elif chunk_header_type == 0x02: # type 2
-            timestamp_delta = self.decoder.stream.read(3)
-        elif chunk_header_type == 0x03: # type 3
+        if header.chunk_header_type == 0x00:   # chunk header type 0
+            header.timestamp = self.stream.read(3)
+            header.message_length = self.stream.read_24bit_uint()
+            header.message_type_id = self.stream.read_uchar()
+            header.message_stream_id = self.stream.read(4)
+        elif header.chunk_header_type == 0x01: # type 1
+            header.timestamp = self.stream.read(3)
+            header.message_length = self.stream.read_24bit_uint()
+            header.message_type_id = self.stream.read_uchar()
+        elif header.chunk_header_type == 0x02: # type 2
+            header.timestamp = self.stream.read(3)
+        elif header.chunk_header_type == 0x03: # type 3
             pass    # no message header
         else:
             raise Exception("[RTMP] Unknown chunk header type")
 
+        return header
 
-    # returns true when succeeded and the self.current_message bytes can be sent to client/server
     def feed_data(self, data):
-        if RtmpParser.counter < 6 and data != b'':  # first 6 are handshake and connect
-            # todo, also decode handshake https://rtmp.veriskope.com/docs/spec/#7211connect
-            RtmpParser.counter += 1
-            self.current_message = data
-            return True
+        if RtmpParser.handshake_counter < 6:
+            RtmpParser.handshake_counter += 1
+            if hasattr(self.parent, 'on_message_parsed'):
+                self.parent.on_message_parsed(data)
+            return
+        elif RtmpParser.handshake_counter == 6:
+            RtmpParser.handshake_counter += 1
+            self.stream = ByteStreamReader()
+            self.packets = dict()
 
-        self.all_data += data
+        self.stream.append(data)
 
-        if self.all_data == b'':
-            return False
-
-        if self.received_new_message:
-            # first 12 bytes are header
-            self.decoder.stream.append(self.all_data[:12])
-
-            self.received_new_message = False
-            self.current_message_parsed = dict()
-            self.current_message = b''
-            self.current_message += self.all_data[:12]
-
-            chunk_header_type = self.decoder.stream.read(1)
-            timestamp_delta = self.decoder.stream.read(3)
-            self.packet_length = self.decoder.stream.read_24bit_uint()
-            message_type_id = self.decoder.stream.read(1)
-            message_stream_id = self.decoder.stream.read(4)
-
-            self.all_data = self.all_data[12:]
-
-        # messages are supposed to be sent in a chunks of 128 bytes
-        # after every chunk theres a 0xc3 byte, in this implementation
-        # it sometimes receives too little or too much bytes, so it has to
-        # step by 128 and remove the 0xc3 and check if packet length is correct
-        rtmp_message = self.all_data
-        i = 0
-        removed = 0  # number of removed 0xc3
-        new_rtmp_message = bytearray()
-        while i < min(len(rtmp_message), self.packet_length + removed):
-            if i + RtmpParser.CHUNK_SIZE < min(len(rtmp_message), self.packet_length + removed):
-                new_rtmp_message.extend(rtmp_message[i:i + RtmpParser.CHUNK_SIZE])
-                # check if the next byte after the chunk is 0xc3
-                if rtmp_message[i + RtmpParser.CHUNK_SIZE] == 0xc3:
-                    i += 1
-                    removed += 1
-                # next chunk
-                i += RtmpParser.CHUNK_SIZE
+        while not self.stream.at_eof():
+            if self.unfinished_packet is None:
+                header = self.read_header()
+                if str(header.chunk_stream_id) not in self.packets:
+                    packet = RtmpPacket(header, b'', header.message_length)
+                    self.packets[str(header.chunk_stream_id)] = packet
+                else:
+                    packet = self.packets[str(header.chunk_stream_id)]
             else:
-                # append the remaining bytes
-                new_rtmp_message.extend(rtmp_message[i:min(len(rtmp_message), self.packet_length + removed)])
-                break
+                packet = self.unfinished_packet
+                self.unfinished_packet = None
 
-        new_rtmp_message = bytes(new_rtmp_message)
-        if self.packet_length > len(new_rtmp_message):  # haven't received enough bytes
-            return False
-        elif self.packet_length == len(new_rtmp_message):
-            self.all_data = rtmp_message[self.packet_length + removed:]
+            read_len = min(self.CHUNK_SIZE, packet.length)
+            if read_len > len(self.stream.data) - self.stream.offset:
+                # not enough bytes received
+                self.unfinished_packet = packet
+                return
+            packet.buffer += self.stream.read(read_len)
+            packet.length -= read_len
+            if packet.length == 0:
+                self.handle_packet(packet)
+                del self.packets[str(packet.header.chunk_stream_id)]
+                self.stream.remove_already_read()
+
+    def handle_packet(self, packet: RtmpPacket):
+        obj = None
+        if packet.header.chunk_header_type == 0x00:
+            if packet.header.message_type_id == 0x14 or packet.header.message_type_id == 0x11:  # AMF0 or AMF3 Command Message
+                obj = dict()
+                decoder = Amf0Decoder(packet.buffer)
+                if ord(decoder.stream.peek(1)) == 0x00:
+                    obj["version"] = 0x00
+                    decoder.stream.read(1)
+                obj["result"] = decoder.decode()
+                obj["invokeId"] = decoder.decode()
+                obj["serviceCall"] = decoder.decode()
+                obj["data"] = decoder.decode()
+                #print(json.dumps(obj, indent=4))
+
+                # mitm example - revealing names in champion select
+                def mitm():
+                    if type(obj["data"]) is Amf0Amf3:
+                        data = obj["data"].value
+                    elif isinstance(obj["data"], dict):
+                        data = obj["data"]
+                    else:
+                        return
+                    if isinstance(data, dict) and "body" in data:
+                        if isinstance(data["body"], dict):
+                            body = data["body"]
+                        elif isinstance(data["body"], list) and len(data["body"]) != 0:
+                            if isinstance(data["body"][0], dict):
+                                body = data["body"][0]
+                            else:
+                                return
+                        else:
+                            return
+                        payload = None
+                        is_compressed = False
+                        if "compressedPayload" in body and body["compressedPayload"] is True:
+                            is_compressed = True
+                            payload = body["payload"]
+                            payload = gzip.decompress(base64.b64decode(payload.encode("utf-8")))
+                        elif "payload" in body and body["payload"]:
+                            payload = body["payload"]
+                        if payload:
+                            payload = json.loads(payload.decode('utf-8') if type(payload) is bytes else payload)
+                            # reveal
+                            if "queueId" in payload and payload["queueId"] == 420:  # soloq
+                                if "championSelectState" in payload:
+                                    for cell in payload["championSelectState"]["cells"]["alliedTeam"]:
+                                        if "nameVisibilityType" in cell and cell["nameVisibilityType"] != "UNHIDDEN":
+                                            cell["nameVisibilityType"] = "UNHIDDEN"
+                                if is_compressed:
+                                    payload = base64.b64encode(gzip.compress(json.dumps(payload).encode('utf-8'))).decode('utf-8')
+                                body["payload"] = payload
+
+                # mitm()
+
+                encoder = Amf0Encoder()
+                if "version" in obj:
+                    encoder.stream.write_uchar(obj["version"])
+                encoder.encode(obj["result"])
+                encoder.encode(obj["invokeId"])
+                encoder.encode(obj["serviceCall"])
+                encoder.encode(obj["data"])
+                new_packet = RtmpPacket(copy.deepcopy(packet.header), packet.buffer[:], 0)
+                new_packet.buffer = encoder.stream.data
+                new_packet.header.message_length = len(new_packet.buffer)
+
+                packet = new_packet
+
+            elif packet.header.message_type_id == 0x01:     # Set Chunk Size
+                pass #etc todo
+            else:
+                print("[RTMP] not amf3 or amf0")
+                pass
+                #raise Exception("[RTMP] Unhandled message type")
         else:
-            raise IndexError("[RTMP] Packet length is smaller than parsed message")
+            pass
+        self.write_packet(packet, obj)
 
-        self.decoder.stream.append(new_rtmp_message)
-        self.current_message += rtmp_message[:self.packet_length + removed]
+    def write_packet(self, packet: RtmpPacket, decoded_obj=None):
+        output = self.write_header(packet.header)
 
-        obj = dict()
-        if self.decoder.stream.peek(1) == b'\x00':
-            obj["version"] = 0x00
-            self.decoder.stream.read(1)
+        packet_len = len(packet.buffer)
+        for i in range(0, packet_len):
+            output.append(packet.buffer[i:i+1])
 
-        try:
-            obj["result"] = self.decoder.readElement()
-            obj["invokeId"] = self.decoder.readElement()
-            obj["serviceCall"] = self.decoder.readElement()
-            obj["data"] = self.decoder.readElement()
-        except Exception as e:
-            print("[RTMP] Failed to parse rtmp message", e)
+            if i % 128 == 127 and i != packet_len - 1:
+                output.append(b'\xc3')
 
-        if not self.decoder.stream.at_eof():
-            print("[RTMP] Parsing failed, decoder not at eof")
-            self.decoder.stream.read(self.decoder.stream.remaining())
+        if hasattr(self.parent, 'on_message_parsed'):
+            self.parent.on_message_parsed(output.data, decoded_obj)
+            #print(output.data)
+
+    def write_header(self, header: RTMPHeader) -> ByteStreamReader:
+        output = ByteStreamReader()
+        output.write_uchar(header.first_byte)
+        if header.chunk_header_type == 0x00:  # chunk header type 0
+            output.write(header.timestamp)
+            output.write_24bit_uint(header.message_length)
+            output.write_uchar(header.message_type_id)
+            output.write(header.message_stream_id)
+        elif header.chunk_header_type == 0x01:  # type 1
+            output.write(header.timestamp)
+            output.write_24bit_uint(header.message_length)
+            output.write_uchar(header.message_type_id)
+        elif header.chunk_header_type == 0x02:  # type 2
+            output.write(header.timestamp)
+        elif header.chunk_header_type == 0x03:  # type 3
+            pass  # no message header
         else:
-            self.current_message_parsed = obj
+            raise Exception("[RTMP] Unknown chunk header type")
 
-        self.received_new_message = True
-        return True
+        return output
 
 
 class ProtocolFromServer(asyncio.Protocol):
@@ -252,14 +284,13 @@ class ProtocolFromServer(asyncio.Protocol):
         #print(f'[RTMP] < {data}')
 
         if self.parser is None:
-            self.parser = RtmpParser()
+            self.parser = RtmpParser(self)
 
-        while self.parser.feed_data(data):
-            log_message(self.parser, False)
+        self.parser.feed_data(data)
 
-            self.league_client.write(self.parser.current_message)
-
-            data = b''
+    def on_message_parsed(self, msg, decoded_obj=None):
+        log_message(decoded_obj if decoded_obj else msg, False)
+        self.league_client.write(msg)
 
     def connection_lost(self, exc):
         print('[RTMP] Connection lost with riot server', exc)
@@ -268,6 +299,7 @@ class ProtocolFromServer(asyncio.Protocol):
         self.on_con_lost.set_result(True)
 
         UiObjects.add_disconnected_item(UiObjects.rtmpList)
+        RtmpParser.handshake_counter = 0
 
 
 class RtmpProxy:
@@ -288,7 +320,6 @@ class RtmpProxy:
             self.league_client = transport
             peername = self.league_client.get_extra_info('peername')
             print(f'[RTMP] League client connected to proxy {peername}')
-            RtmpParser.counter = 0
 
             UiObjects.add_connected_item(UiObjects.rtmpList)
 
@@ -303,17 +334,17 @@ class RtmpProxy:
             #print(f'[RTMP] > {data}')
 
             if self.parser is None:
-                self.parser = RtmpParser()
+                self.parser = RtmpParser(self)
 
-            # while loop because there still might be some unsent data left
-            while self.parser.feed_data(data):
-                log_message(self.parser, True)
-                if self.is_connected:
-                    self.real_server.write(self.parser.current_message)
-                else:
-                    asyncio.ensure_future(
-                        self.connect_to_real_server(self.real_host, self.real_port, self.league_client, data))
-                data = b''
+            self.parser.feed_data(data)
+
+        def on_message_parsed(self, msg, decoded_obj=None):
+            log_message(decoded_obj if decoded_obj else msg, True)
+            if self.is_connected:
+                self.real_server.write(msg)
+            else:
+                asyncio.ensure_future(
+                    self.connect_to_real_server(self.real_host, self.real_port, self.league_client, msg))
 
         async def connect_to_real_server(self, real_host, real_port, league_client, first_req):
             loop = asyncio.get_event_loop()
