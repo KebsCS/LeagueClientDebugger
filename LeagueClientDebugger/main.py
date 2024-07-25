@@ -444,14 +444,15 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         text = json.dumps(data, indent=4) if isinstance(data, dict) else data
         self.allView.setText(text)
 
-        matches = re.findall(JWT_PATTERN, text)
-        if matches:
+        matches_jwt = re.findall(JWT_PATTERN, text)
+        matches_gzip = re.findall(GZIP_PATTERN, text)
+        if matches_jwt or matches_gzip:
             self.allButtonDecodeJWTs.setEnabled(True)
         else:
             self.allButtonDecodeJWTs.setEnabled(False)
 
         self.is_decoded = False
-        self.allButtonDecodeJWTs.setText("Decode JWTs")
+        self.allButtonDecodeJWTs.setText("Decode JWTs and GZIPs")
 
     @pyqtSlot()
     def on_allButtonDecodeJWTs_clicked(self):
@@ -459,8 +460,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         if not self.is_decoded:
             self.original_text = self.allView.toPlainText()
             text = self.original_text
-            matches = re.findall(JWT_PATTERN, text)
-            for match in matches:
+            matches_jwt = re.findall(JWT_PATTERN, text)
+            for match in matches_jwt:
                 payload = match.split('.')[1]
                 payload += '=' * ((4 - len(payload) % 4) % 4)
                 payload = payload.replace('-', '+').replace('_', '/')
@@ -471,6 +472,14 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                     text = text.replace(match, decoded_text)
                 except UnicodeDecodeError:
                     pass
+            matches_gzip = re.findall(GZIP_PATTERN, text)
+            for match in matches_gzip:
+                decoded_text = gzip.decompress(base64.b64decode(match.encode("utf-8"))).decode('utf-8')
+                try:
+                    decoded_text = json.dumps(json.loads(decoded_text), indent=4)
+                except Exception:
+                    pass
+                text = text.replace(match, decoded_text)
             self.allView.setText(text)
             self.allView.verticalScrollBar().setValue(scroll_value)
             self.allButtonDecodeJWTs.setText("Original text")
@@ -478,7 +487,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         else:
             self.allView.setText(self.original_text)  # Restore original text
             self.allView.verticalScrollBar().setValue(scroll_value)
-            self.allButtonDecodeJWTs.setText("Decode JWTs")
+            self.allButtonDecodeJWTs.setText("Decode JWTs and GZIPs")
             self.is_decoded = False
 
     @pyqtSlot(int)

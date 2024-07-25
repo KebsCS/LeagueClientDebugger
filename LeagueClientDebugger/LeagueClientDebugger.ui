@@ -410,7 +410,7 @@
                  </size>
                 </property>
                 <property name="text">
-                 <string>Decode JWTs</string>
+                 <string>Decode JWTs and GZIPs</string>
                 </property>
                </widget>
               </item>

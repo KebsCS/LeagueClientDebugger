@@ -902,7 +902,7 @@ class Ui_LeagueClientDebuggerClass(object):
         self.allButtonTool.setText(_translate("LeagueClientDebuggerClass", "..."))
         self.allLabelRC.setText(_translate("LeagueClientDebuggerClass", "RiotClientServices args:"))
         self.allCheckboxLC.setText(_translate("LeagueClientDebuggerClass", "LeagueClient args:"))
-        self.allButtonDecodeJWTs.setText(_translate("LeagueClientDebuggerClass", "Decode JWTs"))
+        self.allButtonDecodeJWTs.setText(_translate("LeagueClientDebuggerClass", "Decode JWTs and GZIPs"))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_start), _translate("LeagueClientDebuggerClass", "Start"))
         self.xmppButtonSearch.setText(_translate("LeagueClientDebuggerClass", "Search"))
         self.xmppButtonClear.setText(_translate("LeagueClientDebuggerClass", "Clear"))

@@ -23,6 +23,9 @@ class ConfigProxy:
             self.chat_port = chat_port
 
         def edit_response(self, response: requests.Response) -> requests.Response:
+            if response.status_code == 403:
+                raise Exception("Client config Cloudflare blocked, open a github issue or message on discord")
+
             original_config = response.json()
             config = json.dumps(self.edit_config(original_config))
 
