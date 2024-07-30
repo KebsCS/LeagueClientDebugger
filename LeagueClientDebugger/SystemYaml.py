@@ -23,7 +23,7 @@ class SystemYaml:
                         "/Riot Games/Metadata/league_of_legends.live/league_of_legends.live.product_settings.yaml"
 
         if os.path.exists(live_settings):
-            with open(live_settings, 'r') as file:
+            with open(live_settings, 'r', encoding='utf-8') as file:
                 read_data = yaml.YAML(typ='rt').load(file)
                 self.path = read_data['product_install_full_path'] + "\\system.yaml"
 
@@ -31,7 +31,7 @@ class SystemYaml:
                        "/Riot Games/Metadata/league_of_legends.pbe/league_of_legends.pbe.product_settings.yaml"
 
         if os.path.exists(pbe_settings):
-            with open(pbe_settings, 'r') as file:
+            with open(pbe_settings, 'r', encoding='utf-8') as file:
                 read_data = yaml.YAML(typ='rt').load(file)
                 self.path_pbe = read_data['product_install_full_path'] + "\\system.yaml"
 
@@ -42,7 +42,7 @@ class SystemYaml:
     def _read(self, path: str):
         if not os.path.exists(path):
             return
-        with open(path, 'r') as fp:
+        with open(path, 'r', encoding='utf-8') as fp:
             read_data = yaml.YAML(typ='rt').load(fp)
 
             for region in read_data['region_data']:
@@ -77,7 +77,7 @@ class SystemYaml:
         if not os.path.exists(path):
             return
         read_data = None
-        with open(path, 'r') as fp:
+        with open(path, 'r', encoding='utf-8') as fp:
             read_data = yaml.YAML(typ='rt').load(fp)
 
         for region in read_data['region_data']:
@@ -102,7 +102,7 @@ class SystemYaml:
             key["lcds"]["use_tls"] = False
 
         # save
-        with open(path.replace('system.yaml', 'Config\\system.yaml'), 'w') as fp:
+        with open(path.replace('system.yaml', 'Config\\system.yaml'), 'w', encoding='utf-8') as fp:
             yaml.YAML(typ='rt').dump(read_data, fp)
 
 

@@ -28,6 +28,13 @@
       </widget>
      </item>
      <item>
+      <widget class="QCheckBox" name="optionsIncludeRC">
+       <property name="text">
+        <string>Include RC in Start tab</string>
+       </property>
+      </widget>
+     </item>
+     <item>
       <widget class="QCheckBox" name="optionsDisableVanguard">
        <property name="text">
         <string>Disable Vanguard</string>

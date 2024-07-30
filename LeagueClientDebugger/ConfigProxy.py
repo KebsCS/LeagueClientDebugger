@@ -49,11 +49,11 @@ class ConfigProxy:
             config = config.replace("https://scd.riotcdn.net",
                                     f"http://localhost:{ProxyServers.scd_port}")
 
-            config = config.replace("https://player-lifecycle-euc.publishing.riotgames.com",
-                                    f"http://localhost:{ProxyServers.lifecycle_port}")
+            for server in ProxyServers.lifecycle_servers:
+                config = config.replace(server, f"http://localhost:{ProxyServers.lifecycle_servers[server]}")
 
-            config = config.replace("https://eu.lers.loyalty.riotgames.com",
-                                    f"http://localhost:{ProxyServers.loyalty_port}")
+            for server in ProxyServers.loyalty_servers:
+                config = config.replace(server, f"http://localhost:{ProxyServers.loyalty_servers[server]}")
 
             config = config.replace("https://pcbs.loyalty.riotgames.com",
                                     f"http://localhost:{ProxyServers.pcbs_loyalty_port}")
@@ -62,6 +62,18 @@ class ConfigProxy:
                             f"ws://127.0.0.1", config)
 
             #todo "payments.pay_plugin.pmc-edge-url-template": "https://edge.%1.pmc.pay.riotgames.com",
+
+            # lor
+            for server in ProxyServers.lor_login_servers:
+                config = config.replace(server, f"http://localhost:{ProxyServers.lor_login_servers[server]}")
+            for server in ProxyServers.lor_services_servers:
+                config = config.replace(server, f"http://localhost:{ProxyServers.lor_services_servers[server]}")
+            for server in ProxyServers.lor_spectate_servers:
+                config = config.replace(server, f"http://localhost:{ProxyServers.lor_spectate_servers[server]}")
+
+            # # valorant, replacing shared with localhost doesnt work, whitelisted for pvp.net
+            # for server in ProxyServers.shared_servers:
+            #     config = config.replace(server, f"http://127.0.0.1:{ProxyServers.shared_servers[server]}")
 
             #print(config)
             response._content = config.encode()
@@ -140,21 +152,28 @@ class ConfigProxy:
                 # replace_value("lol.client_settings.vanguard.url", "")
                 replace_value("anticheat.vanguard.enabled", False)
 
-                if "keystone.products.league_of_legends.patchlines.live" in config:
-                    if "platforms" in config["keystone.products.league_of_legends.patchlines.live"]:
-                        for node in config["keystone.products.league_of_legends.patchlines.live"]["platforms"]["win"]["configurations"]:
-                            if not node:
-                                continue
-                            if "dependencies" in node:
-                                deps_copy = node["dependencies"][:]
-                                for deps in deps_copy:
-                                    if not deps:
-                                        continue
-                                    if "id" in deps and deps["id"] == "vanguard":
-                                        node["dependencies"].remove(deps)
+                def remove_vg_dependency(patchline: str):
+                    if patchline in config:
+                        if "platforms" in config[patchline]:
+                            for node in config[patchline]["platforms"]["win"]["configurations"]:
+                                if not node:
+                                    continue
+                                if "dependencies" in node:
+                                    deps_copy = node["dependencies"][:]
+                                    for deps in deps_copy:
+                                        if not deps:
+                                            continue
+                                        if "id" in deps and deps["id"] == "vanguard":
+                                            node["dependencies"].remove(deps)
+                remove_vg_dependency("keystone.products.league_of_legends.patchlines.live")
+                remove_vg_dependency("keystone.products.league_of_legends.patchlines.pbe")
+                remove_vg_dependency("keystone.products.valorant.patchlines.live")
 
             replace_value("rms.allow_bad_cert.enabled", True)
             replace_value("rms.port", str(ProxyServers.rms_port))
+
+            replace_value("rndb.client_settings.pft_host", f"localhost:{ProxyServers.pft_port}")
+            replace_value("rndb.client_settings.ap_collector_dns_record", f"http://localhost:{ProxyServers.data_riotgames_port}")
 
             if "keystone.products.league_of_legends.patchlines.live" in config:
                 if "platforms" in config["keystone.products.league_of_legends.patchlines.live"]:

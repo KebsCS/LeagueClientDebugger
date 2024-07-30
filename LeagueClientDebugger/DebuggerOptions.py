@@ -23,6 +23,9 @@ class Ui_Dialog(object):
         self.optionsIncludeLCU = QtWidgets.QCheckBox(Dialog)
         self.optionsIncludeLCU.setObjectName("optionsIncludeLCU")
         self.verticalLayout_3.addWidget(self.optionsIncludeLCU)
+        self.optionsIncludeRC = QtWidgets.QCheckBox(Dialog)
+        self.optionsIncludeRC.setObjectName("optionsIncludeRC")
+        self.verticalLayout_3.addWidget(self.optionsIncludeRC)
         self.optionsDisableVanguard = QtWidgets.QCheckBox(Dialog)
         self.optionsDisableVanguard.setObjectName("optionsDisableVanguard")
         self.verticalLayout_3.addWidget(self.optionsDisableVanguard)
@@ -50,6 +53,7 @@ class Ui_Dialog(object):
         Dialog.setWindowTitle(_translate("Dialog", "Options"))
         self.optionsIncludeLCU.setText(_translate("Dialog", "Include LCU in Start tab \n"
 "(Not recommended, slows down the app)"))
+        self.optionsIncludeRC.setText(_translate("Dialog", "Include RC in Start tab"))
         self.optionsDisableVanguard.setText(_translate("Dialog", "Disable Vanguard"))
         self.optionsEnableInject.setText(_translate("Dialog", "Enable debug dll injecting"))
         self.optionsIncludeJWTs.setText(_translate("Dialog", "Include decoded JWTs in search\n"

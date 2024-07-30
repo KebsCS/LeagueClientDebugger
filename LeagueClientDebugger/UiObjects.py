@@ -11,6 +11,7 @@ class UiObjects:
     rmsList = None
     httpsList = None
     lcuList = None
+    rcList = None
 
     mitmTableWidget = None
 
@@ -21,6 +22,7 @@ class UiObjects:
     optionsDisableVanguard = None
     optionsEnableInject = None
     optionsIncludeLCU = None
+    optionsIncludeRC = None
     optionsIncludeJWTs = None
     optionsDisableAuth = None
 

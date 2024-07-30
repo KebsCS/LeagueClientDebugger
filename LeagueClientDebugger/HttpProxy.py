@@ -9,6 +9,9 @@ import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 CIPHERS = [
+    # "TLS_CHACHA20_POLY1305_SHA256",
+    # "TLS_AES_128_GCM_SHA256",
+    # "TLS_AES_256_GCM_SHA384",
     "ECDHE-ECDSA-CHACHA20-POLY1305",
     "ECDHE-RSA-CHACHA20-POLY1305",
     "ECDHE-ECDSA-AES128-GCM-SHA256",

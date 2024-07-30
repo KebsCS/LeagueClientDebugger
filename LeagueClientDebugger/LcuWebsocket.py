@@ -76,7 +76,7 @@ class LcuWebsocket:
             try:
                 async with websockets.connect("wss://127.0.0.1:" + str(args.lcu_port), extra_headers=headers,
                                               ssl=ssl_context, max_size=2**32, ping_interval=None) as target_ws:
-                    print("[LCU] Started LCU websocket")
+                    print(f"[LCU] Started LCU websocket on port {str(args.lcu_port)}")
                     self.global_ws = target_ws
                     await target_ws.send(b"[5, \"OnJsonApiEvent\"]")
                     async for message in target_ws:
@@ -86,11 +86,15 @@ class LcuWebsocket:
             except ConnectionRefusedError:
                 attempt += 1
                 await asyncio.sleep(1)
+            except websockets.exceptions.ConnectionClosedError:
+                print("[LCU] Websocket closed")
+                return
 
     async def close(self):
         self.is_running = False
         if self.global_ws:
             await self.global_ws.close()
+            print("[LCU] Websocket closed")
 
 
     @staticmethod

@@ -17,6 +17,7 @@ from ProxyServers import ProxyServers
 from UiObjects import UiObjects
 from RmsProxy import RmsProxy
 from LcuWebsocket import LcuWebsocket, LCUConnection
+from RiotWs import RiotWs
 
 # import logging
 # logging.getLogger().setLevel(logging.WARNING)
@@ -29,13 +30,13 @@ from LcuWebsocket import LcuWebsocket, LCUConnection
 os.environ['no_proxy'] = '*'
 
 JWT_PATTERN = r'eyJ[A-Za-z0-9=_-]+(?:\.[A-Za-z0-9=_-]+){2,}'
-GZIP_PATTERN = r'H4sIA[A-Za-z0-9/+=]+' # todo decode rtmp payload button
+GZIP_PATTERN = r'H4sIA[A-Za-z0-9/+=]+'
 
-#todo decode jwts in all tabs
+#todo decode jwts and zips in all tabs not just start
 #todo add auto inject
-#todo lcu in custom, lcu settings, optimize code, relogging, multi client
+#todo lcu settings, optimize code, relogging, multi client
 #todo speed up the listwidgets, maybe listview
-#todo, finish mitm, vairables for mitm, like $timestamp$ or some python code executing
+#todo, finish mitm tab, vairables for mitm, like $timestamp$ so its easy to use
 
 class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
 
@@ -74,6 +75,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         UiObjects.optionsEnableInject = dialog_ui.optionsEnableInject
         dialog_ui.optionsEnableInject.stateChanged.connect(lambda state: self.allButtonInject.show() if state == Qt.Checked else self.allButtonInject.hide())
         UiObjects.optionsIncludeLCU = dialog_ui.optionsIncludeLCU
+        UiObjects.optionsIncludeRC = dialog_ui.optionsIncludeRC
         UiObjects.optionsIncludeJWTs = dialog_ui.optionsIncludeJWTs
         UiObjects.optionsDisableAuth = dialog_ui.optionsDisableAuth
 
@@ -87,6 +89,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         self.tabWidget.setTabIcon(4, self.icon_http)
         self.icon_lcu = QIcon("images/lcu.png")
         self.tabWidget.setTabIcon(5, self.icon_lcu)
+        self.icon_rc = QIcon("images/rc.png")
+        self.tabWidget.setTabIcon(6, self.icon_rc)
 
         self.mitmTableWidget.setColumnWidth(0, 104)
         self.mitmTableWidget.setColumnWidth(1, 73)
@@ -99,6 +103,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         UiObjects.rmsList = self.rmsList
         UiObjects.httpsList = self.httpsList
         UiObjects.lcuList = self.lcuList
+        UiObjects.rcList = self.rcList
 
         self.allTextSearch.installEventFilter(self)
         self.xmppTextSearch.installEventFilter(self)
@@ -106,6 +111,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         self.rmsTextSearch.installEventFilter(self)
         self.httpsTextSearch.installEventFilter(self)
         self.lcuTextSearch.installEventFilter(self)
+        self.rcTextSearch.installEventFilter(self)
 
         self.tab_start.installEventFilter(self)
         self.tab_xmpp.installEventFilter(self)
@@ -113,6 +119,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         self.tab_rms.installEventFilter(self)
         self.tab_https.installEventFilter(self)
         self.tab_lcu.installEventFilter(self)
+        self.tab_rc.installEventFilter(self)
 
         self.xmppList.model().rowsInserted.connect(
             lambda parent, start, end: self.add_item_to_all(self.xmppList, start))
@@ -124,6 +131,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             lambda parent, start, end: self.add_item_to_all(self.httpsList, start))
         self.lcuList.model().rowsInserted.connect(
             lambda parent, start, end: self.add_item_to_all(self.lcuList, start))
+        self.rcList.model().rowsInserted.connect(
+            lambda parent, start, end: self.add_item_to_all(self.rcList, start))
 
 
         SystemYaml().read()
@@ -135,6 +144,10 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         # after load config, because searching for the process lags a bit
         self.lcu_ws = LcuWebsocket()
         self.lcuEnabled.stateChanged.connect(lambda state: self.start_lcu_ws() if state == Qt.Checked else loop.create_task(self.lcu_ws.close()))
+
+        self.rc_ws = RiotWs()
+        self.rcEnabled.stateChanged.connect(
+            lambda state: self.start_rc_ws() if state == Qt.Checked else loop.create_task(self.rc_ws.close()))
 
         UiObjects.mitmTableWidget = self.mitmTableWidget
 
@@ -186,6 +199,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                 return True
             elif handle_enter_in_textedit(self.lcuTextSearch, self.lcuButtonSearch):
                 return True
+            elif handle_enter_in_textedit(self.rcTextSearch, self.rcButtonSearch):
+                return True
 
             elif handle_ctrl_f(self.tab_start, self.allTextSearch):
                 return True
@@ -198,6 +213,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             elif handle_ctrl_f(self.tab_https, self.httpsTextSearch):
                 return True
             elif handle_ctrl_f(self.tab_lcu, self.lcuTextSearch):
+                return True
+            elif handle_ctrl_f(self.tab_rc, self.rcTextSearch):
                 return True
 
         return False    # super().eventFilter(obj, event)
@@ -544,6 +561,13 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         item = self.lcuList.item(row)
         self.lcuView.setText(json.dumps(item.data(256), indent=4))
 
+    @pyqtSlot(int)
+    def on_rcList_currentRowChanged(self, row):
+        if row == -1:
+            return
+        item = self.rcList.item(row)
+        self.rcView.setText(json.dumps(item.data(256), indent=4))
+
     @pyqtSlot()
     def on_allButtonSearch_clicked(self):
         search_text = self.allTextSearch.toPlainText().strip().lower()
@@ -564,7 +588,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                     try:
                         decoded_payload = base64.urlsafe_b64decode(payload.encode()).decode('utf-8')
                         text += "\r\n" + decoded_payload
-                    except UnicodeDecodeError:
+                    except Exception:
                         pass
 
             if search_text in text.lower():
@@ -641,6 +665,21 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             else:
                 item.setBackground(Qt.transparent)
 
+    @pyqtSlot()
+    def on_rcButtonSearch_clicked(self):
+        search_text = self.rcTextSearch.toPlainText().strip().lower()
+        if not search_text:
+            return
+        for index in range(self.rcList.count()):
+            item = self.rcList.item(index)
+            text = item.data(256) if item.data(256) else ""
+            if isinstance(text, dict):
+                text = json.dumps(text)
+            if search_text in text.lower():
+                item.setBackground(Qt.yellow)
+            else:
+                item.setBackground(Qt.transparent)
+
     def start_proxy(self, original_host, port):
         if not original_host:
             return
@@ -653,6 +692,11 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             return
         loop = asyncio.get_event_loop()
         loop.create_task(self.lcu_ws.start_ws())
+
+    def start_rc_ws(self):
+        if self.lcu_ws.global_ws:
+            return
+        asyncio.create_task(self.rc_ws.run())
 
     @pyqtSlot()
     def on_allLaunchLeague_clicked(self):
@@ -692,14 +736,37 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
 
             self.start_proxy("https://sieve.services.riotcdn.net", ProxyServers.sieve_port)
             self.start_proxy("https://scd.riotcdn.net", ProxyServers.scd_port)
-            self.start_proxy("https://player-lifecycle-euc.publishing.riotgames.com", ProxyServers.lifecycle_port)
-            self.start_proxy("https://eu.lers.loyalty.riotgames.com", ProxyServers.loyalty_port )
+
+            for server in ProxyServers.lifecycle_servers:
+                self.start_proxy(server, ProxyServers.lifecycle_servers[server])
+
+            self.start_proxy("https://pft-rndbdev.rdatasrv.net", ProxyServers.pft_port)
+            self.start_proxy("https://data.riotgames.com", ProxyServers.data_riotgames_port)
+
+            for server in ProxyServers.loyalty_servers:
+                self.start_proxy(server, ProxyServers.loyalty_servers[server])
+
             self.start_proxy("https://pcbs.loyalty.riotgames.com", ProxyServers.pcbs_loyalty_port)
+
+            # lor
+            for server in ProxyServers.lor_login_servers:
+                self.start_proxy(server, ProxyServers.lor_login_servers[server])
+            for server in ProxyServers.lor_services_servers:
+                self.start_proxy(server, ProxyServers.lor_services_servers[server])
+            for server in ProxyServers.lor_spectate_servers:
+                self.start_proxy(server, ProxyServers.lor_spectate_servers[server])
+
+            # valorant, doesnt work, only pvp.net urls are working and theres ssl pinning
+            # for server in ProxyServers.shared_servers:
+            #     self.start_proxy(server, ProxyServers.shared_servers[server])
 
             self.proxies_started = True
 
         if self.lcuEnabled.isChecked():
             self.start_lcu_ws()
+
+        if self.rcEnabled.isChecked():
+            self.start_rc_ws()
 
         with open(os.getenv('PROGRAMDATA') + "/Riot Games/RiotClientInstalls.json", 'r', encoding='utf-8') as file: # RiotClientServices.exe
             clientPath = json.load(file)["rc_default"]
@@ -796,6 +863,10 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             if not UiObjects.optionsIncludeLCU.isChecked():
                 return
             item.setIcon(self.icon_lcu)
+        elif list_widget is self.rcList:
+            if not UiObjects.optionsIncludeRC.isChecked():
+                return
+            item.setIcon(self.icon_rc)
 
         scrollbar = self.allList.verticalScrollBar()
         if not scrollbar or scrollbar.value() == scrollbar.maximum():
@@ -827,6 +898,10 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
     @pyqtSlot()
     def on_lcuButtonClear_clicked(self):
         self.lcuList.clear()
+
+    @pyqtSlot()
+    def on_rcButtonClear_clicked(self):
+        self.rcList.clear()
 
     @pyqtSlot()
     def on_httpsFiddlerButton_clicked(self):
@@ -909,6 +984,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                     self.httpsSplitter.restoreState(QByteArray.fromHex(data["httpsSplitter"].encode()))
                 if "lcuSplitter" in data:
                     self.lcuSplitter.restoreState(QByteArray.fromHex(data["lcuSplitter"].encode()))
+                if "rcSplitter" in data:
+                    self.rcSplitter.restoreState(QByteArray.fromHex(data["rcSplitter"].encode()))
                 if "customSplitter" in data:
                     self.customSplitter.restoreState(QByteArray.fromHex(data["customSplitter"].encode()))
 
@@ -946,6 +1023,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                 if "optionsIncludeLCU" in data:
                     UiObjects.optionsIncludeLCU.setChecked(data["optionsIncludeLCU"])
 
+                if "optionsIncludeRC" in data:
+                    UiObjects.optionsIncludeRC.setChecked(data["optionsIncludeRC"])
+
                 if "optionsIncludeJWTs" in data:
                     UiObjects.optionsIncludeJWTs.setChecked(data["optionsIncludeJWTs"])
 
@@ -954,6 +1034,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
 
                 if "lcuEnabled" in data:
                     self.lcuEnabled.setChecked(data["lcuEnabled"])
+
+                if "rcEnabled" in data:
+                    self.rcEnabled.setChecked(data["rcEnabled"])
 
                 if "allTextRCArgs" in data:
                     self.allTextRCArgs.setPlainText(data["allTextRCArgs"])
@@ -1012,6 +1095,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             data["rmsSplitter"] = self.rmsSplitter.saveState().data().hex()
             data["httpsSplitter"] = self.httpsSplitter.saveState().data().hex()
             data["lcuSplitter"] = self.lcuSplitter.saveState().data().hex()
+            data["rcSplitter"] = self.rcSplitter.saveState().data().hex()
             data["customSplitter"] = self.customSplitter.saveState().data().hex()
 
             data["customTableGeometry"] = self.customTable.saveGeometry().data().hex()
@@ -1041,10 +1125,12 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             data["optionsDisableVanguard"] = UiObjects.optionsDisableVanguard.isChecked()
             data["optionsEnableInject"] = UiObjects.optionsEnableInject.isChecked()
             data["optionsIncludeLCU"] = UiObjects.optionsIncludeLCU.isChecked()
+            data["optionsIncludeRC"] = UiObjects.optionsIncludeRC.isChecked()
             data["optionsIncludeJWTs"] = UiObjects.optionsIncludeJWTs.isChecked()
             data["optionsDisableAuth"] = UiObjects.optionsDisableAuth.isChecked()
 
             data["lcuEnabled"] = self.lcuEnabled.isChecked()
+            data["rcEnabled"] = self.rcEnabled.isChecked()
 
             data["allTextRCArgs"] = self.allTextRCArgs.toPlainText()
             data["allTextLCArgs"] = self.allTextLCArgs.toPlainText()

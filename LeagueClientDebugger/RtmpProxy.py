@@ -2,6 +2,7 @@ import asyncio, ssl, copy, gzip, base64, datetime
 from UiObjects import *
 from rtmp.ByteStreamReader import ByteStreamReader
 from rtmp.Amf0 import Amf0Decoder, Amf0Encoder, Amf0Amf3
+from rtmp.Amf3 import Amf3Undefined
 
 
 class CustomJSONEncoder(json.JSONEncoder):
@@ -180,6 +181,7 @@ class RtmpParser:
                                 return
                         else:
                             return
+
                         payload = None
                         is_compressed = False
                         if "compressedPayload" in body and body["compressedPayload"] is True:
@@ -190,30 +192,36 @@ class RtmpParser:
                             payload = body["payload"]
                         if payload:
                             payload = json.loads(payload.decode('utf-8') if type(payload) is bytes else payload)
+
                             # reveal
                             if "queueId" in payload and payload["queueId"] == 420:  # soloq
                                 if "championSelectState" in payload:
                                     for cell in payload["championSelectState"]["cells"]["alliedTeam"]:
                                         if "nameVisibilityType" in cell and cell["nameVisibilityType"] != "UNHIDDEN":
                                             cell["nameVisibilityType"] = "UNHIDDEN"
-                                if is_compressed:
-                                    payload = base64.b64encode(gzip.compress(json.dumps(payload).encode('utf-8'))).decode('utf-8')
-                                body["payload"] = payload
+                            if is_compressed:
+                                payload = base64.b64encode(gzip.compress(json.dumps(payload).encode('utf-8'))).decode('utf-8')
+                            body["payload"] = payload
 
                 # mitm()
 
-                encoder = Amf0Encoder()
-                if "version" in obj:
-                    encoder.stream.write_uchar(obj["version"])
-                encoder.encode(obj["result"])
-                encoder.encode(obj["invokeId"])
-                encoder.encode(obj["serviceCall"])
-                encoder.encode(obj["data"])
-                new_packet = RtmpPacket(copy.deepcopy(packet.header), packet.buffer[:], 0)
-                new_packet.buffer = encoder.stream.data
-                new_packet.header.message_length = len(new_packet.buffer)
+                try:
+                    encoder = Amf0Encoder()
+                    if "version" in obj:
+                        encoder.stream.write_uchar(obj["version"])
+                    encoder.encode(obj["result"])
+                    encoder.encode(obj["invokeId"])
+                    encoder.encode(obj["serviceCall"])
+                    encoder.encode(obj["data"])
+                    new_packet = RtmpPacket(copy.deepcopy(packet.header), packet.buffer[:], 0)
+                    new_packet.buffer = encoder.stream.data
+                    new_packet.header.message_length = len(new_packet.buffer)
 
-                packet = new_packet
+                    packet = new_packet
+                except Exception as e:
+                    print(f"Amf encode error: {e}")
+                    print(f"Handled packet: {packet.buffer}")
+
 
             elif packet.header.message_type_id == 0x01:     # Set Chunk Size
                 pass #etc todo
