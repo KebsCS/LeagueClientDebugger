@@ -143,8 +143,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         self.rcList.model().rowsInserted.connect(
             lambda parent, start, end: self.add_item_to_all(self.rcList, start))
 
-
-        SystemYaml().read()
+        SystemYaml.read()
 
         self.allRegions.addItems(SystemYaml.regions)
 
@@ -162,7 +161,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
 
         ProxyServers.assign_ports()
 
-        SystemYaml().edit()
+        SystemYaml.edit()
 
         self.proxies_started = False
         self.custom_process = None
