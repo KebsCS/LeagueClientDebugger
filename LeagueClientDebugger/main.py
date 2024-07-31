@@ -64,6 +64,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         UiObjects.allTextLCArgs = self.allTextLCArgs
         self.allButtonTool.clicked.connect(self.show_hide_args)
 
+        UiObjects.valoCallGets = self.valoCallGets
+
         self.allButtonDecodeJWTs.setEnabled(False)
 
         self.options_dialog = QtWidgets.QDialog()
@@ -87,10 +89,12 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         self.tabWidget.setTabIcon(3, self.icon_rms)
         self.icon_http = QIcon("images/http.png")
         self.tabWidget.setTabIcon(4, self.icon_http)
+        self.icon_valo = QIcon("images/valo.png")
+        self.tabWidget.setTabIcon(5, self.icon_valo)
         self.icon_lcu = QIcon("images/lcu.png")
-        self.tabWidget.setTabIcon(5, self.icon_lcu)
+        self.tabWidget.setTabIcon(6, self.icon_lcu)
         self.icon_rc = QIcon("images/rc.png")
-        self.tabWidget.setTabIcon(6, self.icon_rc)
+        self.tabWidget.setTabIcon(7, self.icon_rc)
 
         self.mitmTableWidget.setColumnWidth(0, 104)
         self.mitmTableWidget.setColumnWidth(1, 73)
@@ -102,6 +106,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         UiObjects.rtmpList = self.rtmpList
         UiObjects.rmsList = self.rmsList
         UiObjects.httpsList = self.httpsList
+        UiObjects.valoList = self.valoList
         UiObjects.lcuList = self.lcuList
         UiObjects.rcList = self.rcList
 
@@ -110,6 +115,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         self.rtmpTextSearch.installEventFilter(self)
         self.rmsTextSearch.installEventFilter(self)
         self.httpsTextSearch.installEventFilter(self)
+        self.valoTextSearch.installEventFilter(self)
         self.lcuTextSearch.installEventFilter(self)
         self.rcTextSearch.installEventFilter(self)
 
@@ -118,6 +124,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         self.tab_rtmp.installEventFilter(self)
         self.tab_rms.installEventFilter(self)
         self.tab_https.installEventFilter(self)
+        self.tab_valo.installEventFilter(self)
         self.tab_lcu.installEventFilter(self)
         self.tab_rc.installEventFilter(self)
 
@@ -129,6 +136,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             lambda parent, start, end: self.add_item_to_all(self.rmsList, start))
         self.httpsList.model().rowsInserted.connect(
             lambda parent, start, end: self.add_item_to_all(self.httpsList, start))
+        self.valoList.model().rowsInserted.connect(
+            lambda parent, start, end: self.add_item_to_all(self.valoList, start))
         self.lcuList.model().rowsInserted.connect(
             lambda parent, start, end: self.add_item_to_all(self.lcuList, start))
         self.rcList.model().rowsInserted.connect(
@@ -197,6 +206,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                 return True
             elif handle_enter_in_textedit(self.httpsTextSearch, self.httpsButtonSearch):
                 return True
+            elif handle_enter_in_textedit(self.valoTextSearch, self.valoButtonSearch):
+                return True
             elif handle_enter_in_textedit(self.lcuTextSearch, self.lcuButtonSearch):
                 return True
             elif handle_enter_in_textedit(self.rcTextSearch, self.rcButtonSearch):
@@ -211,6 +222,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             elif handle_ctrl_f(self.tab_rms, self.rmsTextSearch):
                 return True
             elif handle_ctrl_f(self.tab_https, self.httpsTextSearch):
+                return True
+            elif handle_ctrl_f(self.tab_valo, self.valoTextSearch):
                 return True
             elif handle_ctrl_f(self.tab_lcu, self.lcuTextSearch):
                 return True
@@ -555,6 +568,13 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         self.httpsResponse.setText(item.data(257))
 
     @pyqtSlot(int)
+    def on_valoList_currentRowChanged(self, row):
+        if row == -1:
+            return
+        item = self.valoList.item(row)
+        self.valoView.setText(item.data(256))
+
+    @pyqtSlot(int)
     def on_lcuList_currentRowChanged(self, row):
         if row == -1:
             return
@@ -651,6 +671,19 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                 item.setBackground(Qt.transparent)
 
     @pyqtSlot()
+    def on_valoButtonSearch_clicked(self):
+        search_text = self.valoTextSearch.toPlainText().strip().lower()
+        if not search_text:
+            return
+        for index in range(self.valoList.count()):
+            item = self.valoList.item(index)
+            text = item.data(256)
+            if search_text in text.lower():
+                item.setBackground(Qt.yellow)
+            else:
+                item.setBackground(Qt.transparent)
+
+    @pyqtSlot()
     def on_lcuButtonSearch_clicked(self):
         search_text = self.lcuTextSearch.toPlainText().strip().lower()
         if not search_text:
@@ -694,7 +727,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         loop.create_task(self.lcu_ws.start_ws())
 
     def start_rc_ws(self):
-        if self.lcu_ws.global_ws:
+        if self.rc_ws.global_ws:
             return
         asyncio.create_task(self.rc_ws.run())
 
@@ -859,6 +892,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             item.setIcon(self.icon_http)
             text = item.data(256) + "\n\n\n" + item.data(257)
             item.setData(256, text)
+        elif list_widget is self.valoList:
+            item.setIcon(self.icon_valo)
         elif list_widget is self.lcuList:
             if not UiObjects.optionsIncludeLCU.isChecked():
                 return
@@ -894,6 +929,10 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
     @pyqtSlot()
     def on_httpsButtonClear_clicked(self):
         self.httpsList.clear()
+
+    @pyqtSlot()
+    def on_valoButtonClear_clicked(self):
+        self.valoList.clear()
 
     @pyqtSlot()
     def on_lcuButtonClear_clicked(self):
@@ -982,6 +1021,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                     self.rmsSplitter.restoreState(QByteArray.fromHex(data["rmsSplitter"].encode()))
                 if "httpsSplitter" in data:
                     self.httpsSplitter.restoreState(QByteArray.fromHex(data["httpsSplitter"].encode()))
+                if "valoSplitter" in data:
+                    self.valoSplitter.restoreState(QByteArray.fromHex(data["valoSplitter"].encode()))
                 if "lcuSplitter" in data:
                     self.lcuSplitter.restoreState(QByteArray.fromHex(data["lcuSplitter"].encode()))
                 if "rcSplitter" in data:
@@ -1032,6 +1073,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                 if "optionsDisableAuth" in data:
                     UiObjects.optionsDisableAuth.setChecked(data["optionsDisableAuth"])
 
+                if "valoCallGets" in data:
+                    self.valoCallGets.setChecked(data["valoCallGets"])
+
                 if "lcuEnabled" in data:
                     self.lcuEnabled.setChecked(data["lcuEnabled"])
 
@@ -1041,7 +1085,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                 if "allTextRCArgs" in data:
                     self.allTextRCArgs.setPlainText(data["allTextRCArgs"])
                 else:
-                    self.allTextRCArgs.setPlainText("--allow-multiple-clients --launch-product=league_of_legends")
+                    self.allTextRCArgs.setPlainText("--allow-multiple-clients")
 
                 if "allTextLCArgs" in data:
                     self.allTextLCArgs.setPlainText(data["allTextLCArgs"])
@@ -1094,6 +1138,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             data["rtmpSplitter"] = self.rtmpSplitter.saveState().data().hex()
             data["rmsSplitter"] = self.rmsSplitter.saveState().data().hex()
             data["httpsSplitter"] = self.httpsSplitter.saveState().data().hex()
+            data["valoSplitter"] = self.valoSplitter.saveState().data().hex()
             data["lcuSplitter"] = self.lcuSplitter.saveState().data().hex()
             data["rcSplitter"] = self.rcSplitter.saveState().data().hex()
             data["customSplitter"] = self.customSplitter.saveState().data().hex()
@@ -1129,6 +1174,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             data["optionsIncludeJWTs"] = UiObjects.optionsIncludeJWTs.isChecked()
             data["optionsDisableAuth"] = UiObjects.optionsDisableAuth.isChecked()
 
+            data["valoCallGets"] = self.valoCallGets.isChecked()
             data["lcuEnabled"] = self.lcuEnabled.isChecked()
             data["rcEnabled"] = self.rcEnabled.isChecked()
 
