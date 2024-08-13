@@ -35,9 +35,11 @@ class SSLAdapter(HTTPAdapter):
     def init_poolmanager(self, *a: Any, **k: Any) -> None:
         c = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
         c.check_hostname = False
-        c.set_ciphers(':'.join(CIPHERS))
-        c.minimum_version = ssl.TLSVersion.TLSv1_2
         c.verify_mode = ssl.CERT_NONE
+        c.set_ciphers(':'.join(CIPHERS))
+        c.minimum_version = ssl.TLSVersion.TLSv1
+        c.options |= 1 << 19  # SSL_OP_NO_ENCRYPT_THEN_MAC
+        c.options |= 1 << 14  # SSL_OP_NO_TICKET
 
         k['ssl_context'] = c
         return super(SSLAdapter, self).init_poolmanager(*a, **k)
@@ -45,9 +47,11 @@ class SSLAdapter(HTTPAdapter):
     def proxy_manager_for(self, *a: Any, **k: Any):
         c = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
         c.check_hostname = False
-        c.set_ciphers(':'.join(CIPHERS))
-        c.minimum_version = ssl.TLSVersion.TLSv1_2
         c.verify_mode = ssl.CERT_NONE
+        c.set_ciphers(':'.join(CIPHERS))
+        c.minimum_version = ssl.TLSVersion.TLSv1
+        c.options |= 1 << 19  # SSL_OP_NO_ENCRYPT_THEN_MAC
+        c.options |= 1 << 14  # SSL_OP_NO_TICKET
 
         k['ssl_context'] = c
         return super(SSLAdapter, self).proxy_manager_for(*a, **k)
