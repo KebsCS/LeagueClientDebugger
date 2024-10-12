@@ -205,22 +205,25 @@ class RtmpParser:
 
                 # mitm()
 
-                try:
-                    encoder = Amf0Encoder()
-                    if "version" in obj:
-                        encoder.stream.write_uchar(obj["version"])
-                    encoder.encode(obj["result"])
-                    encoder.encode(obj["invokeId"])
-                    encoder.encode(obj["serviceCall"])
-                    encoder.encode(obj["data"])
-                    new_packet = RtmpPacket(copy.deepcopy(packet.header), packet.buffer[:], 0)
-                    new_packet.buffer = encoder.stream.data
-                    new_packet.header.message_length = len(new_packet.buffer)
+                # Uncomment if you make any changes to the packets
+                # Encoding slows down the client a bit, and it's not necessary
 
-                    packet = new_packet
-                except Exception as e:
-                    print(f"Amf encode error: {e}")
-                    print(f"Handled packet: {packet.buffer}")
+                # try:
+                #     encoder = Amf0Encoder()
+                #     if "version" in obj:
+                #         encoder.stream.write_uchar(obj["version"])
+                #     encoder.encode(obj["result"])
+                #     encoder.encode(obj["invokeId"])
+                #     encoder.encode(obj["serviceCall"])
+                #     encoder.encode(obj["data"])
+                #     new_packet = RtmpPacket(copy.deepcopy(packet.header), packet.buffer[:], 0)
+                #     new_packet.buffer = encoder.stream.data
+                #     new_packet.header.message_length = len(new_packet.buffer)
+                #
+                #     packet = new_packet
+                # except Exception as e:
+                #     print(f"Amf encode error: {e}")
+                #     print(f"Handled packet: {packet.buffer}")
 
 
             elif packet.header.message_type_id == 0x01:     # Set Chunk Size

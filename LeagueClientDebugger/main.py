@@ -4,7 +4,7 @@ import sys, json, time, os, io, asyncio, pymem, requests, gzip, re, base64, date
 from lxml import etree
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import pyqtSlot, pyqtSignal, Qt, QEvent, QByteArray
-from PyQt5.QtCore import QObject, QProcess, QCoreApplication, QItemSelection, QModelIndex
+from PyQt5.QtCore import QObject, QProcess, QItemSelection, QModelIndex
 from PyQt5.QtWidgets import QMessageBox, QFileDialog, QListWidgetItem, QTableWidgetItem, QComboBox, QPushButton
 from PyQt5.QtGui import QColor, QIcon, QTextCharFormat, QTextCursor, QTextDocument, QSyntaxHighlighter, QGuiApplication
 from qasync import QEventLoop, QApplication
@@ -26,7 +26,7 @@ from RiotWs import RiotWs
 # logger.handlers = []  # Remove all handlers
 # logger.setLevel(logging.NOTSET)
 
-
+# fix requests being blocked by fiddler
 os.environ['no_proxy'] = '*'
 
 JWT_PATTERN = r'eyJ[A-Za-z0-9=_-]+(?:\.[A-Za-z0-9=_-]+){2,}'
@@ -41,7 +41,7 @@ GZIP_PATTERN = r'H4sIA[A-Za-z0-9/+=]+'
 class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
 
     counter = 0
-    saveDir = QCoreApplication.applicationDirPath()
+    saveDir = os.path.dirname(os.path.abspath(__file__)).replace('\\', '/') + '/'
     startTime = time.time()
     configFileName = "config_lcd.json"
 

@@ -48,33 +48,36 @@ class SystemYaml:
     @staticmethod
     def _read(path: str) -> bool:
         if not os.path.exists(path):
+            print(f"{path} doesnt exist")
             return False
         with open(path, 'r', encoding='utf-8') as fp:
             read_data = yaml.YAML(typ='rt').load(fp)
 
             for region in read_data['region_data']:
                 SystemYaml.regions.append(region)
-
                 key = read_data['region_data'][region]["servers"]
-                try:
-                    SystemYaml.chat[region] = key["chat"]["chat_host"] + ":" + str(key["chat"]["chat_port"])  # euw1.chat.si.riotgames.com:5223
-                    SystemYaml.client_config[region] = key["client_config"]["client_config_url"]  # https://clientconfig.rpg.riotgames.com
-                    SystemYaml.email[region] = key["email_verification"]["external_url"]  # https://email-verification.riotgames.com/api
-                    email_url = SystemYaml.email[region]
-                    SystemYaml.email[region] = email_url[:email_url.find(".com") + len(".com")]
-                    SystemYaml.entitlements[region] = key["entitlements"]["entitlements_url"] # https://entitlements.auth.riotgames.com/api/token/v1
-                    entitlements_url = SystemYaml.entitlements[region]
-                    SystemYaml.entitlements[region] = entitlements_url[:entitlements_url.find(".com") + len(".com")]
-                    SystemYaml.lcds[region] = key["lcds"]["lcds_host"] + ":" + str(key["lcds"]["lcds_port"])  #feapp.euw1.lol.pvp.net:2099
-                    SystemYaml.ledge[region] = key["league_edge"]["league_edge_url"]  # https://euw-red.lol.sgp.pvp.net
-                    # no payments on pbe
-                    SystemYaml.payments[region] = key.get("payments", {}).get("payments_host", "")    # https://plstore.euw1.lol.riotgames.com
-                    #todo idk why its sometimes green and breaks with mailbox endpoint
-                    SystemYaml.player_platform[region] = key["player_platform_edge"]["player_platform_edge_url"].replace("green", "red")   # https://euc1-red.pp.sgp.pvp.net
-                    SystemYaml.rms[region] = key["rms"]["rms_url"]    # wss://eu.edge.rms.si.riotgames.com:443
-                except KeyError as e:
-                    print(f"KeyError: {e} not found for region {region}")
-                    pass
+
+                def safe_set(dictionary, key, key_path, append_com=False):
+                    try:
+                        value = eval(key_path)
+                        dictionary[region] = value
+                        if append_com:
+                            temp = dictionary[region]
+                            dictionary[region] = temp[:temp.find(".com") + len(".com")]
+                    except KeyError as e:
+                        print(f"KeyError read: {e} not found for region {region}")
+
+                safe_set(SystemYaml.chat, key, "key['chat']['chat_host'] + ':' + str(key['chat']['chat_port'])") # euw1.chat.si.riotgames.com:5223
+                safe_set(SystemYaml.client_config, key, "key['client_config']['client_config_url']") # https://clientconfig.rpg.riotgames.com
+                safe_set(SystemYaml.email, key,"key['email_verification']['external_url']", True)  # https://email-verification.riotgames.com/api
+                safe_set(SystemYaml.entitlements, key,"key['entitlements']['entitlements_url']", True)  # https://entitlements.auth.riotgames.com/api/token/v1
+                safe_set(SystemYaml.lcds, key, "key['lcds']['lcds_host'] + ':' + str(key['lcds']['lcds_port'])")  # feapp.euw1.lol.pvp.net:2099
+                safe_set(SystemYaml.ledge, key,"key['league_edge']['league_edge_url']")  # https://euw-red.lol.sgp.pvp.net
+                safe_set(SystemYaml.payments, key,"key['payments']['payments_host']")  # https://plstore.euw1.lol.riotgames.com
+                # todo idk why its sometimes green and breaks with mailbox endpoint
+                safe_set(SystemYaml.player_platform, key,"key['player_platform_edge']['player_platform_edge_url'].replace('green', 'red')")  # https://euc1-red.pp.sgp.pvp.net
+                safe_set(SystemYaml.rms, key,"key['rms']['rms_url']")  # wss://eu.edge.rms.si.riotgames.com:443
+
         return True
 
     @staticmethod
@@ -93,23 +96,32 @@ class SystemYaml:
         for region in read_data['region_data']:
             key = read_data['region_data'][region]["servers"]
 
-            key["email_verification"]["external_url"] = key["email_verification"]["external_url"].replace(
-                SystemYaml.email[region], f"http://localhost:{ProxyServers.email_port}")
-            key["entitlements"]["entitlements_url"] = key["entitlements"]["entitlements_url"].replace(
-                SystemYaml.entitlements[region], f"http://localhost:{ProxyServers.entitlements_port}")
-            key["league_edge"]["league_edge_url"] = key["league_edge"]["league_edge_url"].replace(
-                SystemYaml.ledge[region], f"http://localhost:{ProxyServers.ledge_port}")
-            try:    # no payments on pbe
-                key["payments"]["payments_host"] = key["payments"]["payments_host"].replace(
-                    SystemYaml.payments[region], f"http://localhost:{ProxyServers.payments_port}")
+            # some keys don't exist on different servers
+            def safe_replace_key(key_dict, key_path, dictionary, new_value):
+                try:
+                    key[key_dict][key_path] = key[key_dict][key_path].replace(
+                        dictionary[region], new_value)
+                except KeyError as e:
+                    print(f"KeyError edit: {e} not found for region {region}")
+                    pass
+
+            safe_replace_key("email_verification", "external_url", SystemYaml.email,
+                             f"http://localhost:{ProxyServers.email_port}")
+            safe_replace_key("entitlements", "entitlements_url", SystemYaml.entitlements,
+                             f"http://localhost:{ProxyServers.entitlements_port}")
+            safe_replace_key("league_edge", "league_edge_url", SystemYaml.ledge,
+                             f"http://localhost:{ProxyServers.ledge_port}")
+            safe_replace_key("payments", "payments_host", SystemYaml.payments,
+                             f"http://localhost:{ProxyServers.payments_port}")
+            safe_replace_key("player_platform_edge", "player_platform_edge_url", SystemYaml.player_platform,
+                             f"http://localhost:{ProxyServers.player_platform_port}")
+
+            try:
+                key["lcds"]["lcds_host"] = "127.0.0.1"
+                key["lcds"]["lcds_port"] = ProxyServers.rtmp_port
+                key["lcds"]["use_tls"] = False
             except KeyError as e:
                 pass
-            key["player_platform_edge"]["player_platform_edge_url"] = key["player_platform_edge"]["player_platform_edge_url"].replace(
-                SystemYaml.player_platform[region], f"http://localhost:{ProxyServers.player_platform_port}")
-
-            key["lcds"]["lcds_host"] = "127.0.0.1"
-            key["lcds"]["lcds_port"] = ProxyServers.rtmp_port
-            key["lcds"]["use_tls"] = False
 
         # save
         with open(path.replace('system.yaml', 'Config\\system.yaml'), 'w', encoding='utf-8') as fp:

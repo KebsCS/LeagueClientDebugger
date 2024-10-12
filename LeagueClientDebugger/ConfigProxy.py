@@ -145,6 +145,9 @@ class ConfigProxy:
             #     config["lol.game_client_settings.pregame_rpd_config"]["send"] = True
 
 
+            # revert change, that makes the league client load longer
+            replace_value("lol.client_settings.startup.should_wait_for_home_hubs", False)
+
             # -------------- Important below
 
             if UiObjects.optionsDisableVanguard.isChecked():

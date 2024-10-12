@@ -1,14 +1,14 @@
 ![Example](https://i.imgur.com/riDrBoc.png)
 
 ## Features
-* See all requests the League Client and Riot Client send and receive - HTTP/S, RMS (riot messaging service), XMPP (chat) and RTMP (custom games)
+* See all requests the Riot Client and Riot's games send and receive - HTTP/S, RMS (riot messaging service), XMPP (chat), RTMP (custom games) and websockets
+* Works on League of Legends, Valorant, Teamfight Tactics and Legends of Runeterra
 * Modify the requests to change how the client works, eg. disable vanguard
 * LCU and Riot Client websocket connection
 * Send custom requests directly to the server or straight to client
 * Fiddler or other HTTP proxy integration
 * Run client with custom command line arguments, eg. LCU on any port you want 
 * Disable OpenSSL verification certificate errors and see the client logs
-* Works on League of Legends, Valorant and Legends of Runeterra
 
 
 ## Installation
@@ -17,7 +17,7 @@
 3. Run `cd LeagueClientDebugger`
 4. `pip install -r requirements.txt`
 5. Close all running League and Riot clients
-6. `python main.py`, tested on python 3.9.7
+6. `python main.py`, tested on python 3.9.7 and 3.12.3
 7. Select your server and press the `Launch Client` button 
 
 
