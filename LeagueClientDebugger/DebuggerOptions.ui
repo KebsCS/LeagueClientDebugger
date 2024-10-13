@@ -20,17 +20,16 @@
    <item>
     <layout class="QVBoxLayout" name="verticalLayout_3">
      <item>
-      <widget class="QCheckBox" name="optionsIncludeLCU">
+      <widget class="QCheckBox" name="optionsDarkMode">
        <property name="text">
-        <string>Include LCU in Start tab 
-(Not recommended, slows down the app)</string>
+        <string>Dark mode</string>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QCheckBox" name="optionsIncludeRC">
+      <widget class="QCheckBox" name="optionsRunAsAdmin">
        <property name="text">
-        <string>Include RC in Start tab</string>
+        <string>Always run debugger as admin</string>
        </property>
       </widget>
      </item>
@@ -43,6 +42,9 @@
      </item>
      <item>
       <widget class="QCheckBox" name="optionsEnableInject">
+       <property name="toolTip">
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Shows league client logs and bypasses openssl verifications&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+       </property>
        <property name="text">
         <string>Enable debug dll injecting</string>
        </property>
@@ -53,6 +55,21 @@
        <property name="text">
         <string>Include decoded JWTs in search
 (Currently only in Start tab)</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QCheckBox" name="optionsIncludeLCU">
+       <property name="text">
+        <string>Include LCU in Start tab 
+(Not recommended, slows down the app)</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QCheckBox" name="optionsIncludeRC">
+       <property name="text">
+        <string>Include RC in Start tab</string>
        </property>
       </widget>
      </item>

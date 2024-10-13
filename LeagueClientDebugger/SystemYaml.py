@@ -1,5 +1,5 @@
 import os
-from ruamel import yaml  # pip install ruamel.yaml
+from ruamel import yaml
 from ProxyServers import ProxyServers
 
 
@@ -20,16 +20,16 @@ class SystemYaml:
 
     @staticmethod
     def setup():
-        live_settings = os.getenv('PROGRAMDATA') + \
-                        "/Riot Games/Metadata/league_of_legends.live/league_of_legends.live.product_settings.yaml"
+        live_settings = os.getenv('PROGRAMDATA', r"C:\ProgramData") + \
+                        r"\Riot Games\Metadata\league_of_legends.live\league_of_legends.live.product_settings.yaml"
 
         if os.path.exists(live_settings):
             with open(live_settings, 'r', encoding='utf-8') as file:
                 read_data = yaml.YAML(typ='rt').load(file)
                 SystemYaml.path = read_data['product_install_full_path'] + "\\system.yaml"
 
-        pbe_settings = os.getenv('PROGRAMDATA') + \
-                       "/Riot Games/Metadata/league_of_legends.pbe/league_of_legends.pbe.product_settings.yaml"
+        pbe_settings = os.getenv('PROGRAMDATA', r"C:\ProgramData") + \
+                       r"\Riot Games\Metadata\league_of_legends.pbe\league_of_legends.pbe.product_settings.yaml"
 
         if os.path.exists(pbe_settings):
             with open(pbe_settings, 'r', encoding='utf-8') as file:

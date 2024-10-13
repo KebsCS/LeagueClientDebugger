@@ -44,6 +44,13 @@ class ProxyServers:
         "https://player-lifecycle-usw.publishing.riotgames.com": 0,
     }
 
+    playerpreferences_new_servers = {
+        "https://player-preferences-apne1.pp.sgp.pvp.net": 0,
+        "https://player-preferences-euc1.pp.sgp.pvp.net": 0,
+        "https://player-preferences-apse1.pp.sgp.pvp.net": 0,
+        "https://player-preferences-usw2.pp.sgp.pvp.net": 0,
+    }
+
     # lor
     lor_login_servers = {
         "https://l-americas-green.b.pvp.net": 0,

@@ -20,12 +20,12 @@ class Ui_Dialog(object):
         self.horizontalLayout.setObjectName("horizontalLayout")
         self.verticalLayout_3 = QtWidgets.QVBoxLayout()
         self.verticalLayout_3.setObjectName("verticalLayout_3")
-        self.optionsIncludeLCU = QtWidgets.QCheckBox(Dialog)
-        self.optionsIncludeLCU.setObjectName("optionsIncludeLCU")
-        self.verticalLayout_3.addWidget(self.optionsIncludeLCU)
-        self.optionsIncludeRC = QtWidgets.QCheckBox(Dialog)
-        self.optionsIncludeRC.setObjectName("optionsIncludeRC")
-        self.verticalLayout_3.addWidget(self.optionsIncludeRC)
+        self.optionsDarkMode = QtWidgets.QCheckBox(Dialog)
+        self.optionsDarkMode.setObjectName("optionsDarkMode")
+        self.verticalLayout_3.addWidget(self.optionsDarkMode)
+        self.optionsRunAsAdmin = QtWidgets.QCheckBox(Dialog)
+        self.optionsRunAsAdmin.setObjectName("optionsRunAsAdmin")
+        self.verticalLayout_3.addWidget(self.optionsRunAsAdmin)
         self.optionsDisableVanguard = QtWidgets.QCheckBox(Dialog)
         self.optionsDisableVanguard.setObjectName("optionsDisableVanguard")
         self.verticalLayout_3.addWidget(self.optionsDisableVanguard)
@@ -35,6 +35,12 @@ class Ui_Dialog(object):
         self.optionsIncludeJWTs = QtWidgets.QCheckBox(Dialog)
         self.optionsIncludeJWTs.setObjectName("optionsIncludeJWTs")
         self.verticalLayout_3.addWidget(self.optionsIncludeJWTs)
+        self.optionsIncludeLCU = QtWidgets.QCheckBox(Dialog)
+        self.optionsIncludeLCU.setObjectName("optionsIncludeLCU")
+        self.verticalLayout_3.addWidget(self.optionsIncludeLCU)
+        self.optionsIncludeRC = QtWidgets.QCheckBox(Dialog)
+        self.optionsIncludeRC.setObjectName("optionsIncludeRC")
+        self.verticalLayout_3.addWidget(self.optionsIncludeRC)
         self.optionsDisableAuth = QtWidgets.QCheckBox(Dialog)
         self.optionsDisableAuth.setObjectName("optionsDisableAuth")
         self.verticalLayout_3.addWidget(self.optionsDisableAuth)
@@ -51,13 +57,16 @@ class Ui_Dialog(object):
     def retranslateUi(self, Dialog):
         _translate = QtCore.QCoreApplication.translate
         Dialog.setWindowTitle(_translate("Dialog", "Options"))
-        self.optionsIncludeLCU.setText(_translate("Dialog", "Include LCU in Start tab \n"
-"(Not recommended, slows down the app)"))
-        self.optionsIncludeRC.setText(_translate("Dialog", "Include RC in Start tab"))
+        self.optionsDarkMode.setText(_translate("Dialog", "Dark mode"))
+        self.optionsRunAsAdmin.setText(_translate("Dialog", "Always run debugger as admin"))
         self.optionsDisableVanguard.setText(_translate("Dialog", "Disable Vanguard"))
+        self.optionsEnableInject.setToolTip(_translate("Dialog", "<html><head/><body><p>Shows league client logs and bypasses openssl verifications</p></body></html>"))
         self.optionsEnableInject.setText(_translate("Dialog", "Enable debug dll injecting"))
         self.optionsIncludeJWTs.setText(_translate("Dialog", "Include decoded JWTs in search\n"
 "(Currently only in Start tab)"))
+        self.optionsIncludeLCU.setText(_translate("Dialog", "Include LCU in Start tab \n"
+"(Not recommended, slows down the app)"))
+        self.optionsIncludeRC.setText(_translate("Dialog", "Include RC in Start tab"))
         self.optionsDisableAuth.setText(_translate("Dialog", "Disable auth proxy\n"
 "(When you have problems with cloudflare 403)"))
 

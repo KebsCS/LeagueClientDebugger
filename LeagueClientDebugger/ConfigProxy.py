@@ -32,6 +32,9 @@ class ConfigProxy:
             config = config.replace("https://playerpreferences.riotgames.com",
                                     f"http://localhost:{ProxyServers.playerpreferences_port}")
 
+            for server in ProxyServers.playerpreferences_new_servers:
+                config = config.replace(server, f"http://localhost:{ProxyServers.playerpreferences_new_servers[server]}")
+
             config = config.replace("https://api.account.riotgames.com",
                                     f"http://localhost:{ProxyServers.accounts_port}")
 

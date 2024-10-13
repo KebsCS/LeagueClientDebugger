@@ -1,12 +1,12 @@
 from LeagueClientDebugger import Ui_LeagueClientDebuggerClass
 from DebuggerOptions import Ui_Dialog
-import sys, json, time, os, io, asyncio, pymem, requests, gzip, re, base64, datetime, psutil
+import sys, json, time, os, io, asyncio, pymem, requests, gzip, re, base64, datetime, psutil, ctypes, shutil
 from lxml import etree
 from PyQt5 import QtWidgets
-from PyQt5.QtCore import pyqtSlot, pyqtSignal, Qt, QEvent, QByteArray
+from PyQt5.QtCore import pyqtSlot, pyqtSignal, Qt, QEvent, QByteArray, QSize
 from PyQt5.QtCore import QObject, QProcess, QItemSelection, QModelIndex
 from PyQt5.QtWidgets import QMessageBox, QFileDialog, QListWidgetItem, QTableWidgetItem, QComboBox, QPushButton
-from PyQt5.QtGui import QColor, QIcon, QTextCharFormat, QTextCursor, QTextDocument, QSyntaxHighlighter, QGuiApplication
+from PyQt5.QtGui import QColor, QIcon, QTextCharFormat, QTextCursor, QPalette, QSyntaxHighlighter, QGuiApplication
 from qasync import QEventLoop, QApplication
 from ConfigProxy import ConfigProxy
 from ChatProxy import ChatProxy
@@ -37,16 +37,21 @@ GZIP_PATTERN = r'H4sIA[A-Za-z0-9/+=]+'
 #todo lcu settings, optimize code, relogging, multi client
 #todo speed up the listwidgets, maybe listview
 #todo, finish mitm tab, vairables for mitm, like $timestamp$ so its easy to use
+#todo logs tab with all client logs, File->Force close clients
+#todo pengu loader debloat plugin with easily editable blocklist config
 
 class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
+    startTime = time.time()
 
     counter = 0
-    saveDir = os.path.dirname(os.path.abspath(__file__)).replace('\\', '/') + '/'
-    startTime = time.time()
-    configFileName = "config_lcd.json"
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    save_dir = os.path.join(base_dir, "saves\\")
+    config_dir = os.path.join(base_dir, "config_lcd.json")
 
     port = 0
     chatPort = 0
+
+    blocklist_enabled = False
 
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent=parent)
@@ -72,28 +77,33 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         dialog_ui = Ui_Dialog()
         dialog_ui.setupUi(self.options_dialog)
         self.options_dialog.setWindowFlags(self.options_dialog.windowFlags() & ~Qt.WindowContextHelpButtonHint | Qt.WindowCloseButtonHint)
-        UiObjects.optionsDisableVanguard = dialog_ui.optionsDisableVanguard
 
+        UiObjects.optionsDarkMode = dialog_ui.optionsDarkMode
+        self.default_palette = QApplication.palette()
+        dialog_ui.optionsDarkMode.stateChanged.connect(
+            lambda state: self.apply_theme(True if state == Qt.Checked else False))
+        UiObjects.optionsDisableVanguard = dialog_ui.optionsDisableVanguard
         UiObjects.optionsEnableInject = dialog_ui.optionsEnableInject
         dialog_ui.optionsEnableInject.stateChanged.connect(lambda state: self.allButtonInject.show() if state == Qt.Checked else self.allButtonInject.hide())
         UiObjects.optionsIncludeLCU = dialog_ui.optionsIncludeLCU
         UiObjects.optionsIncludeRC = dialog_ui.optionsIncludeRC
         UiObjects.optionsIncludeJWTs = dialog_ui.optionsIncludeJWTs
         UiObjects.optionsDisableAuth = dialog_ui.optionsDisableAuth
+        UiObjects.optionsRunAsAdmin = dialog_ui.optionsRunAsAdmin
 
-        self.icon_xmpp = QIcon("images/xmpp.png")
+        self.icon_xmpp = QIcon(os.path.join(self.base_dir, "images/xmpp.png"))
         self.tabWidget.setTabIcon(1, self.icon_xmpp)
-        self.icon_rtmp = QIcon("images/rtmp.png")
+        self.icon_rtmp = QIcon(os.path.join(self.base_dir, "images/rtmp.png"))
         self.tabWidget.setTabIcon(2, self.icon_rtmp)
-        self.icon_rms = QIcon("images/rms.png")
+        self.icon_rms = QIcon(os.path.join(self.base_dir, "images/rms.png"))
         self.tabWidget.setTabIcon(3, self.icon_rms)
-        self.icon_http = QIcon("images/http.png")
+        self.icon_http = QIcon(os.path.join(self.base_dir, r"images/http.png"))
         self.tabWidget.setTabIcon(4, self.icon_http)
-        self.icon_valo = QIcon("images/valo.png")
+        self.icon_valo = QIcon(os.path.join(self.base_dir, "images/valo.png"))
         self.tabWidget.setTabIcon(5, self.icon_valo)
-        self.icon_lcu = QIcon("images/lcu.png")
+        self.icon_lcu = QIcon(os.path.join(self.base_dir, "images/lcu.png"))
         self.tabWidget.setTabIcon(6, self.icon_lcu)
-        self.icon_rc = QIcon("images/rc.png")
+        self.icon_rc = QIcon(os.path.join(self.base_dir, "images/rc.png"))
         self.tabWidget.setTabIcon(7, self.icon_rc)
 
         self.mitmTableWidget.setColumnWidth(0, 104)
@@ -102,6 +112,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         self.tabWidget.setMovable(True)
 
         UiObjects.allList = self.allList
+        self.allList.setIconSize(QSize(16,16))
         UiObjects.xmppList = self.xmppList
         UiObjects.rtmpList = self.rtmpList
         UiObjects.rmsList = self.rmsList
@@ -148,6 +159,21 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         self.allRegions.addItems(SystemYaml.regions)
 
         self.LoadConfig()
+
+        if UiObjects.optionsRunAsAdmin.isChecked():
+            def is_admin():
+                try:
+                    return ctypes.windll.shell32.IsUserAnAdmin()
+                except:
+                    return False
+
+            if not is_admin():
+                print("Restarting as admin")
+                ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
+                exit(1)
+
+        self.miscBlocklistLabel.setText(f"Hosts blocklist {'(Active)' if self.blocklist_enabled else ''}")
+        self.miscTextDate.setText(str(datetime.datetime.fromtimestamp(self.startTime).strftime('%Y-%m-%d %H:%M:%S')))
 
         # after load config, because searching for the process lags a bit
         self.lcu_ws = LcuWebsocket()
@@ -231,11 +257,37 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
 
         return False    # super().eventFilter(obj, event)
 
+    def apply_theme(self, dark_mode):
+        if dark_mode:
+            QApplication.setStyle("fusion")
+            dark_palette = QPalette()
+            dark_palette.setColor(QPalette.Window, QColor(53, 53, 53))
+            dark_palette.setColor(QPalette.WindowText, Qt.white)
+            dark_palette.setColor(QPalette.Base, QColor(35, 35, 35))
+            dark_palette.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
+            dark_palette.setColor(QPalette.ToolTipBase, QColor(25, 25, 25))
+            dark_palette.setColor(QPalette.ToolTipText, Qt.white)
+            dark_palette.setColor(QPalette.Text, Qt.white)
+            dark_palette.setColor(QPalette.Button, QColor(53, 53, 53))
+            dark_palette.setColor(QPalette.ButtonText, Qt.white)
+            dark_palette.setColor(QPalette.BrightText, Qt.red)
+            dark_palette.setColor(QPalette.Link, QColor(42, 130, 218))
+            dark_palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
+            dark_palette.setColor(QPalette.HighlightedText, QColor(35, 35, 35))
+            dark_palette.setColor(QPalette.Active, QPalette.Button, QColor(53, 53, 53))
+            dark_palette.setColor(QPalette.Disabled, QPalette.ButtonText, Qt.darkGray)
+            dark_palette.setColor(QPalette.Disabled, QPalette.WindowText, Qt.darkGray)
+            dark_palette.setColor(QPalette.Disabled, QPalette.Text, Qt.darkGray)
+            dark_palette.setColor(QPalette.Disabled, QPalette.Light, QColor(53, 53, 53))
+            app.setPalette(dark_palette)
+        else:
+            QApplication.setStyle("windowsvista")
+            app.setPalette(self.default_palette)
+
     @pyqtSlot()
     def on_allButtonInject_clicked(self):
         try:
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            dll_path = os.path.join(current_dir, "LeagueHooker/x64/Release/LeagueHooker.dll")
+            dll_path = os.path.join(self.base_dir, "LeagueHooker/x64/Release/LeagueHooker.dll")
 
             if not os.path.exists(dll_path):
                 print("DLL file not found:", dll_path)
@@ -756,8 +808,13 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             self.start_proxy(SystemYaml.payments[selected_region], ProxyServers.payments_port)
 
             #todo get all hardcoded urls from config proxy if possible
+            # todo, isnt apne1-red, maybe just a bug
+            #"matchmaking.configuration.base_url_by_affinity": {
+              #  "asia": "https://apne-red.pp.sgp.pvp.net",
 
             self.start_proxy("https://playerpreferences.riotgames.com", ProxyServers.playerpreferences_port)
+            for server in ProxyServers.playerpreferences_new_servers:
+                self.start_proxy(server, ProxyServers.playerpreferences_new_servers[server])
             self.start_proxy("https://riot-geo.pas.si.riotgames.com", ProxyServers.geo_port)
             if not UiObjects.optionsDisableAuth.isChecked():
                 self.start_proxy("https://auth.riotgames.com", ProxyServers.auth_port)
@@ -800,7 +857,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         if self.rcEnabled.isChecked():
             self.start_rc_ws()
 
-        with open(os.getenv('PROGRAMDATA') + "/Riot Games/RiotClientInstalls.json", 'r', encoding='utf-8') as file: # RiotClientServices.exe
+        with open(os.getenv('PROGRAMDATA', r"C:\ProgramData") + r"\Riot Games\RiotClientInstalls.json", 'r', encoding='utf-8') as file: # RiotClientServices.exe
             clientPath = json.load(file)["rc_default"]
             league = QProcess(None)
 
@@ -824,9 +881,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
 
     @pyqtSlot()
     def on_actionChoose_directory_triggered(self):
-        self.saveDir = QFileDialog.getExistingDirectory(self, "Select save directory", self.saveDir)
-        if self.saveDir and self.saveDir[-1] != "/":
-            self.saveDir += "/"
+        self.save_dir = QFileDialog.getExistingDirectory(self, "Select save directory", self.save_dir)
+        if self.save_dir and self.save_dir[-1] != "/":
+            self.save_dir += "/"
         self.SaveConfig()
 
     @pyqtSlot(bool)
@@ -840,13 +897,20 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
 
     @pyqtSlot()
     def on_actionSave_full_client_config_triggered(self):
-        with open(f'{self.saveDir}fullconfig.txt', 'w', encoding="utf-8") as file:
-            json.dump(ConfigProxy.full_config, file)
+        if not os.path.exists(self.save_dir):
+            os.makedirs(self.save_dir)
+
+        current_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        with open(os.path.join(self.save_dir, f'fullconfig_{current_time}.txt'), 'w', encoding="utf-8") as file:
+            json.dump(ConfigProxy.full_config, file, indent=4)
 
     @pyqtSlot()
     def on_actionSave_all_requests_triggered(self):
-        current_time = datetime.datetime.now().strftime("%H-%M-%S")
-        with open(f'{self.saveDir}all_requests{current_time}.txt', 'w', encoding="utf-8") as file:
+        if not os.path.exists(self.save_dir):
+            os.makedirs(self.save_dir)
+
+        current_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        with open(os.path.join(self.save_dir, f'all_requests_{current_time}.txt'), 'w', encoding="utf-8") as file:
             for index in range(self.allList.count()):
                 item = self.allList.item(index)
                 if item is not None:
@@ -955,10 +1019,101 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
     def on_httpsFiddlerEnabled_stateChanged(self, state):
         self.on_httpsFiddlerButton_clicked()
 
+    @pyqtSlot()
+    def on_miscButtonViewhosts_clicked(self):
+        os.startfile(os.getenv("SystemRoot", r"C:\Windows") + r"\System32\drivers\etc\hosts")
+
+    def rewrite_etc_hosts(self, hostmap, save_code):
+        hosts_file = os.getenv("SystemRoot", r"C:\Windows") + r"\System32\drivers\etc\hosts"
+        backup_file = f'{hosts_file}.sbak'
+        append = f'# LeagueClientDebugger-{save_code}'
+
+        with open(hosts_file) as f:
+            old_content = f.read()
+
+        if old_content.strip() and not os.path.exists(backup_file):
+            try:
+                os.link(hosts_file, backup_file)
+            except OSError:
+                # File is locked, perform non-atomic copy
+                shutil.copyfile(hosts_file, backup_file)
+
+        temp = f"{hosts_file}.{save_code}.tmp"
+        try:
+            with open(temp, 'w') as f:
+                for line in old_content.rstrip().split('\n'):
+                    if append in line:
+                        continue
+                    f.write(f'{line}\n')
+
+                for host, ip in sorted(hostmap.items()):
+                    f.write(f'{ip} {host:<30} {append}\n')
+        except PermissionError:
+            QMessageBox.about(self, "No Administrator Rights", "To enable admin privileges for future debugging sessions, go to `Tools`->`Options` and select `Always run debugger as admin`")
+            return False
+
+        try:
+            os.rename(temp, hosts_file)
+        except OSError:
+            # File is locked, perform non-atomic copy
+            shutil.move(temp, hosts_file)
+
+        return True
+
+    @pyqtSlot()
+    def on_miscButtonActivate_clicked(self):
+        hostmap = {}
+        for line in self.miscBlocklist.toPlainText().splitlines():
+            stripped_line = line.strip()
+            if not stripped_line:
+                continue
+            hostmap[stripped_line] = "0.0.0.0"
+
+        if(self.rewrite_etc_hosts(hostmap, 1)):
+            self.blocklist_enabled = True
+            self.miscBlocklistLabel.setText(f"Hosts blocklist (Active)")
+            self.SaveConfig()
+
+    @pyqtSlot()
+    def on_miscButtonDeactivate_clicked(self):
+        def restore_etc_hosts(hostmap, save_code):
+            if len(hostmap) > 0:
+                self.rewrite_etc_hosts({}, save_code)
+
+        hostmap = {}
+        for line in self.miscBlocklist.toPlainText().splitlines():
+            stripped_line = line.strip()
+            if not stripped_line:
+                continue
+            hostmap[stripped_line] = "0.0.0.0"
+        restore_etc_hosts(hostmap, 1)
+        self.blocklist_enabled = False
+        self.miscBlocklistLabel.setText(f"Hosts blocklist")
+        self.SaveConfig()
+
+    @pyqtSlot()
+    def on_miscButtonTimestamp_clicked(self):
+        timestamp = self.miscTextTimestamp.toPlainText()
+        try:
+            date = datetime.datetime.fromtimestamp(float(timestamp))
+            formatted_date = date.strftime('%Y-%m-%d %H:%M:%S')
+            self.miscTextDate.setText(f"{formatted_date}")
+        except Exception as e:
+            print(f"Error: {e}. The provided timestamp is not valid.")
+
+    @pyqtSlot()
+    def on_miscButtonDate_clicked(self):
+        date = self.miscTextDate.toPlainText()
+        try:
+            date_object = datetime.datetime.strptime(date, '%Y-%m-%d %H:%M:%S')
+            self.miscTextTimestamp.setText(f"{int(date_object.timestamp())}")
+        except Exception as e:
+            print(f"Error: {e}. The provided date is not valid.")
+
     #region Config
     def LoadConfig(self):
-        mode = 'r' if os.path.exists(self.configFileName) else 'w'
-        with open(self.configFileName, mode, encoding='utf-8') as configFile:
+        mode = 'r' if os.path.exists(self.config_dir) else 'w'
+        with open(self.config_dir, mode, encoding='utf-8') as configFile:
             try:
                 data = json.load(configFile)
             except (io.UnsupportedOperation, json.decoder.JSONDecodeError):
@@ -972,8 +1127,11 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                     for i, tab_text in enumerate(data["tab_order"]):
                         for j in range(self.tabWidget.count()):
                             if self.tabWidget.tabText(j) == tab_text:
-                                #self.tabWidget.tabBar().moveTab(j, i)
-                                self.tabWidget.moveTab(j, i)
+                                try:
+                                    self.tabWidget.moveTab(j, i)
+                                except AttributeError:
+                                    print("DetachableTabWidget not added to ui code")
+                                    self.tabWidget.tabBar().moveTab(j, i)
                                 break
                     self.tabWidget.setCurrentIndex(0)
 
@@ -981,8 +1139,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                     self.actionStay_on_top.setChecked(data["stay_on_top"])
                     self.on_actionStay_on_top_triggered(self.actionStay_on_top.isChecked())
 
-                if "saveDir" in data:
-                    self.saveDir = data["saveDir"]
+                if "save_dir" in data:
+                    self.save_dir = data["save_dir"]
                 if "mitm" in data:
                     for rule in data["mitm"]:
                         self.on_mitmAddButton_clicked()
@@ -1052,6 +1210,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                                 item.setData(258, req["headers"])
                             item.setData(259, req["body"])
 
+                if "optionsDarkMode" in data:
+                    UiObjects.optionsDarkMode.setChecked(data["optionsDarkMode"])
+
                 if "optionsDisableVanguard" in data:
                     UiObjects.optionsDisableVanguard.setChecked(data["optionsDisableVanguard"])
                     if data["optionsEnableInject"]:
@@ -1071,6 +1232,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
 
                 if "optionsDisableAuth" in data:
                     UiObjects.optionsDisableAuth.setChecked(data["optionsDisableAuth"])
+
+                if "optionsRunAsAdmin" in data:
+                    UiObjects.optionsRunAsAdmin.setChecked(data["optionsRunAsAdmin"])
 
                 if "valoCallGets" in data:
                     self.valoCallGets.setChecked(data["valoCallGets"])
@@ -1097,6 +1261,18 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                 if "allCheckboxLC" in data:
                     self.allCheckboxLC.setChecked(data["allCheckboxLC"])
 
+                if "blocklist_enabled" in data:
+                    self.blocklist_enabled = data["blocklist_enabled"]
+
+                if "blocklist_hosts" in data:
+                    self.miscBlocklist.setText(data["blocklist_hosts"])
+                else:
+                    default_host_blocklist = ("data.riotgames.com\n"
+                                              "ekg.riotgames.com\n"
+                                              "metric-api.newrelic.com\n"
+                                              "telemetry.sgp.pvp.net")
+                    self.miscBlocklist.setText(default_host_blocklist)
+
                 self.on_httpsFiddlerButton_clicked()
 
             except KeyError as e:
@@ -1104,8 +1280,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                 pass
 
     def SaveConfig(self):
-        with open(self.configFileName, 'r+', encoding='utf-8') as configFile:
-            data = json.load(configFile) if os.stat(self.configFileName).st_size != 0 else {}
+        with open(self.config_dir, 'r+', encoding='utf-8') as configFile:
+            data = json.load(configFile) if os.stat(self.config_dir).st_size != 0 else {}
 
             data["geometry"] = self.saveGeometry().data().hex()
 
@@ -1116,7 +1292,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
 
             data["stay_on_top"] = self.actionStay_on_top.isChecked()
 
-            data['saveDir'] = self.saveDir
+            data['save_dir'] = self.save_dir
             data["mitm"] = []
             for row in range(self.mitmTableWidget.rowCount()):
                 rule = {"type": self.mitmTableWidget.cellWidget(row, 0).currentText(),
@@ -1166,12 +1342,14 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                     req["body"] = item.data(259)
                 data["customTable"].append(req)
 
+            data["optionsDarkMode"] = UiObjects.optionsDarkMode.isChecked()
             data["optionsDisableVanguard"] = UiObjects.optionsDisableVanguard.isChecked()
             data["optionsEnableInject"] = UiObjects.optionsEnableInject.isChecked()
             data["optionsIncludeLCU"] = UiObjects.optionsIncludeLCU.isChecked()
             data["optionsIncludeRC"] = UiObjects.optionsIncludeRC.isChecked()
             data["optionsIncludeJWTs"] = UiObjects.optionsIncludeJWTs.isChecked()
             data["optionsDisableAuth"] = UiObjects.optionsDisableAuth.isChecked()
+            data["optionsRunAsAdmin"] = UiObjects.optionsRunAsAdmin.isChecked()
 
             data["valoCallGets"] = self.valoCallGets.isChecked()
             data["lcuEnabled"] = self.lcuEnabled.isChecked()
@@ -1181,6 +1359,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             data["allTextLCArgs"] = self.allTextLCArgs.toPlainText()
             data["allCheckboxLC"] = self.allCheckboxLC.isChecked()
 
+            data["blocklist_enabled"] = self.blocklist_enabled
+            data["blocklist_hosts"] = self.miscBlocklist.toPlainText()
 
             configFile.seek(0)
             json.dump(data, configFile, indent=4)
@@ -1189,6 +1369,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
     #endregion
 
     def closeEvent(self, event):
+        #todo close all proxies
        self.SaveConfig()
        event.accept()
 

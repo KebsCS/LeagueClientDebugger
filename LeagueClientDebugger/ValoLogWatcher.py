@@ -8,7 +8,7 @@ class ValoLogWatcher:
         self.entitlements = entitlements
 
     async def run(self):
-        log_path = os.getenv('LOCALAPPDATA') + "\VALORANT\Saved\Logs\ShooterGame.log"
+        log_path = os.getenv('LOCALAPPDATA') + r"\VALORANT\Saved\Logs\ShooterGame.log"
         if not os.path.exists(log_path):
             print(f"File {log_path} does not exist.")
             return

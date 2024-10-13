@@ -7,7 +7,8 @@
 * LCU and Riot Client websocket connection
 * Send custom requests directly to the server or straight to client
 * Fiddler or other HTTP proxy integration
-* Run client with custom command line arguments, eg. LCU on any port you want 
+* Run client with custom command line arguments, eg. LCU on any port you want
+* Custom hosts blocklist to disable telemetry and tracking
 * Disable OpenSSL verification certificate errors and see the client logs
 
 
