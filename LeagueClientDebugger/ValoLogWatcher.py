@@ -66,7 +66,7 @@ class ValoLogWatcher:
                 await asyncio.sleep(0.1)
 
     def extract_details(self, log_entry):
-        pattern = r"QueryName: \[([^\]]+)\], URL \[([A-Z]+) (https?://[^\]]+)\],.*Response Code: \[(\d{3})\]"
+        pattern = r"QueryName: \[([^\]]+)\], URL \[([A-Z]+) (https?://[^\]]+)\],.*Response Code: \[(\d{0,3})\]"
         match = re.search(pattern, log_entry)
         if match:
             query_name = match.group(1)
@@ -74,20 +74,24 @@ class ValoLogWatcher:
             url = match.group(3)
             response_code = match.group(4)
             return query_name, method, url, response_code
+        print("[Valo] Something wrong: ", log_entry)
         return None, None, None, None
 
     @staticmethod
     async def log_message(query_name, method, url, response_code, headers, response=None):
         item = QListWidgetItem()
         current_time = datetime.datetime.now().strftime("%H:%M:%S")
-        text = f"[{current_time}] {str(response_code)} {method} {url}   {query_name}"
+        if response:
+            text = f"[{current_time}] {str(response_code)}{f' ({str(response.status_code.real)})' if str(response.status_code.real) != str(response_code) else ''} {method} {url}   {query_name}"
+        else:
+            text = f"[{current_time}] {str(response_code)} {method} {url}   {query_name}"
         item.setText(text)
         data = f"{method} {url} HTTP/1.1\r\nHost: {requests.compat.urlparse(url).netloc}\r\n"
         for key in headers:
             data += f"{key}: {headers[key]}\r\n"
         data += "\r\n\r\n\r\n"
 
-        if response != None and str(response.status_code.real) == str(response_code):
+        if response != None:
             raw_response_str = to_raw_response(response).decode()
             try:
                 if "Content-Type" in response.headers and response.status_code.real != 204:

@@ -1,8 +1,9 @@
-from LeagueClientDebugger import Ui_LeagueClientDebuggerClass
-from DebuggerOptions import Ui_Dialog
+from DetachableTabWidget import DetachableTabWidget
+from PyQt5 import QtWidgets
+QtWidgets.QTabWidget = DetachableTabWidget
 import sys, json, time, os, io, asyncio, pymem, requests, gzip, re, base64, datetime, psutil, ctypes, shutil
 from lxml import etree
-from PyQt5 import QtWidgets
+from PyQt5.uic import loadUiType # PyCharm bug, import works fine
 from PyQt5.QtCore import pyqtSlot, pyqtSignal, Qt, QEvent, QByteArray, QSize
 from PyQt5.QtCore import QObject, QProcess, QItemSelection, QModelIndex
 from PyQt5.QtWidgets import QMessageBox, QFileDialog, QListWidgetItem, QTableWidgetItem, QComboBox, QPushButton
@@ -39,7 +40,9 @@ GZIP_PATTERN = r'H4sIA[A-Za-z0-9/+=]+'
 #todo, finish mitm tab, vairables for mitm, like $timestamp$ so its easy to use
 #todo logs tab with all client logs, File->Force close clients
 #todo pengu loader debloat plugin with easily editable blocklist config
+#todo update popup, default button in launch args, refactor main.py and config(default values etc)
 
+Ui_LeagueClientDebuggerClass, _ = loadUiType(os.path.join(os.path.dirname(os.path.abspath(__file__)), "LeagueClientDebugger.ui"))
 class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
     startTime = time.time()
 
@@ -69,11 +72,14 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         UiObjects.allTextLCArgs = self.allTextLCArgs
         self.allButtonTool.clicked.connect(self.show_hide_args)
 
+        UiObjects.allDisableVanguard = self.allDisableVanguard
         UiObjects.valoCallGets = self.valoCallGets
 
         self.allButtonDecodeJWTs.setEnabled(False)
 
         self.options_dialog = QtWidgets.QDialog()
+        Ui_Dialog, _ = loadUiType(
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "DebuggerOptions.ui"))
         dialog_ui = Ui_Dialog()
         dialog_ui.setupUi(self.options_dialog)
         self.options_dialog.setWindowFlags(self.options_dialog.windowFlags() & ~Qt.WindowContextHelpButtonHint | Qt.WindowCloseButtonHint)
@@ -82,7 +88,6 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         self.default_palette = QApplication.palette()
         dialog_ui.optionsDarkMode.stateChanged.connect(
             lambda state: self.apply_theme(True if state == Qt.Checked else False))
-        UiObjects.optionsDisableVanguard = dialog_ui.optionsDisableVanguard
         UiObjects.optionsEnableInject = dialog_ui.optionsEnableInject
         dialog_ui.optionsEnableInject.stateChanged.connect(lambda state: self.allButtonInject.show() if state == Qt.Checked else self.allButtonInject.hide())
         UiObjects.optionsIncludeLCU = dialog_ui.optionsIncludeLCU
@@ -930,6 +935,37 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         if stay_on_top:
             self.on_actionStay_on_top_triggered(True)
 
+    @pyqtSlot()
+    def on_actionForce_Close_Clients_triggered(self):
+        def terminate_processes_by_name(procs : list):
+            for proc in psutil.process_iter(['pid', 'name']):
+                try:
+                    if proc.info['name'] in procs:
+                        print(f"Terminating {proc.info['name']} with PID {proc.info['pid']}")
+                        proc.terminate()
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                    pass
+
+        processes = [
+            "RiotClientCrashHandler.exe",
+            "RiotClientServices.exe",
+            "RiotClientUx.exe",
+            "RiotClientUxRender.exe",
+            "Riot Client.exe",
+
+            "LeagueCrashHandler.exe",
+            "LeagueCrashHandler64.exe",
+            "LeagueClient.exe",
+            "LeagueClientUx.exe",
+            "LeagueClientUxRender.exe",
+
+            "VALORANT.exe",
+            "VALORANT-Win64-Shipping.exe",
+            # "UnrealCEFSubProcess.exe",
+        ]
+        terminate_processes_by_name(processes)
+        #todo, close all proxies
+
 
     def add_item_to_all(self, list_widget, start):
         item = list_widget.item(start).clone()
@@ -1213,13 +1249,15 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                 if "optionsDarkMode" in data:
                     UiObjects.optionsDarkMode.setChecked(data["optionsDarkMode"])
 
-                if "optionsDisableVanguard" in data:
-                    UiObjects.optionsDisableVanguard.setChecked(data["optionsDisableVanguard"])
-                    if data["optionsEnableInject"]:
-                        self.allButtonInject.show()
+                if "allDisableVanguard" in data:
+                    self.allDisableVanguard.setChecked(data["allDisableVanguard"])
+                elif "optionsDisableVanguard" in data: # backwards compatibility
+                    self.allDisableVanguard.setChecked(data["optionsDisableVanguard"])
 
                 if "optionsEnableInject" in data:
                     UiObjects.optionsEnableInject.setChecked(data["optionsEnableInject"])
+                    if data["optionsEnableInject"]:
+                        self.allButtonInject.show()
 
                 if "optionsIncludeLCU" in data:
                     UiObjects.optionsIncludeLCU.setChecked(data["optionsIncludeLCU"])
@@ -1229,6 +1267,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
 
                 if "optionsIncludeJWTs" in data:
                     UiObjects.optionsIncludeJWTs.setChecked(data["optionsIncludeJWTs"])
+                else:
+                    UiObjects.optionsIncludeJWTs.setChecked(True)
 
                 if "optionsDisableAuth" in data:
                     UiObjects.optionsDisableAuth.setChecked(data["optionsDisableAuth"])
@@ -1343,7 +1383,6 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                 data["customTable"].append(req)
 
             data["optionsDarkMode"] = UiObjects.optionsDarkMode.isChecked()
-            data["optionsDisableVanguard"] = UiObjects.optionsDisableVanguard.isChecked()
             data["optionsEnableInject"] = UiObjects.optionsEnableInject.isChecked()
             data["optionsIncludeLCU"] = UiObjects.optionsIncludeLCU.isChecked()
             data["optionsIncludeRC"] = UiObjects.optionsIncludeRC.isChecked()
@@ -1351,6 +1390,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             data["optionsDisableAuth"] = UiObjects.optionsDisableAuth.isChecked()
             data["optionsRunAsAdmin"] = UiObjects.optionsRunAsAdmin.isChecked()
 
+            data["allDisableVanguard"] = self.allDisableVanguard.isChecked()
             data["valoCallGets"] = self.valoCallGets.isChecked()
             data["lcuEnabled"] = self.lcuEnabled.isChecked()
             data["rcEnabled"] = self.rcEnabled.isChecked()

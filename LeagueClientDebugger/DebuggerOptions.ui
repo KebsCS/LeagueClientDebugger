@@ -34,13 +34,6 @@
       </widget>
      </item>
      <item>
-      <widget class="QCheckBox" name="optionsDisableVanguard">
-       <property name="text">
-        <string>Disable Vanguard</string>
-       </property>
-      </widget>
-     </item>
-     <item>
       <widget class="QCheckBox" name="optionsEnableInject">
        <property name="toolTip">
         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Shows league client logs and bypasses openssl verifications&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>

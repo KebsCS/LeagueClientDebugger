@@ -19,11 +19,11 @@ class UiObjects:
     allCheckboxLC = None
     allTextLCArgs = None
 
+    allDisableVanguard = None
     valoCallGets = None
 
     # Options
     optionsDarkMode = None
-    optionsDisableVanguard = None
     optionsEnableInject = None
     optionsIncludeLCU = None
     optionsIncludeRC = None

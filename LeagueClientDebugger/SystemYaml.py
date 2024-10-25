@@ -65,7 +65,14 @@ class SystemYaml:
                             temp = dictionary[region]
                             dictionary[region] = temp[:temp.find(".com") + len(".com")]
                     except KeyError as e:
-                        print(f"KeyError read: {e} not found for region {region}")
+                        if region == "PBE" or region == "PBE_TEST":
+                            if str(e) == "'league_edge'":
+                                dictionary[region] = "https://pbe-red.lol.sgp.pvp.net"
+                            elif str(e) == "'payments'":
+                                dictionary[region] = ""
+                        else:
+                            print(f"KeyError read: {e} not found for region {region}")
+
 
                 safe_set(SystemYaml.chat, key, "key['chat']['chat_host'] + ':' + str(key['chat']['chat_port'])") # euw1.chat.si.riotgames.com:5223
                 safe_set(SystemYaml.client_config, key, "key['client_config']['client_config_url']") # https://clientconfig.rpg.riotgames.com
@@ -102,6 +109,8 @@ class SystemYaml:
                     key[key_dict][key_path] = key[key_dict][key_path].replace(
                         dictionary[region], new_value)
                 except KeyError as e:
+                    if (region == "PBE" or region == "PBE_TEST") and (str(e) == "'payments'" or str(e) == "'league_edge'"):
+                        return
                     print(f"KeyError edit: {e} not found for region {region}")
                     pass
 
@@ -124,18 +133,20 @@ class SystemYaml:
                 pass
 
         # save
-        with open(path.replace('system.yaml', 'Config\\system.yaml'), 'w', encoding='utf-8') as fp:
+        new_path = path.replace('system.yaml', 'Config\\system.yaml')
+        os.makedirs(os.path.dirname(new_path), exist_ok=True) # make the Config folder if it doesn't exist
+        with open(new_path, 'w', encoding='utf-8') as fp:
             yaml.YAML(typ='rt').dump(read_data, fp)
 
     @staticmethod
     def set_default_values():
-        SystemYaml.regions = ['BR', 'EUNE', 'EUW', 'JP', 'LA1', 'LA2', 'ME1', 'NA', 'OC1', 'RU', 'TEST', 'TR']
+        SystemYaml.regions = ['BR', 'EUNE', 'EUW', 'JP', 'LA1', 'LA2', 'ME1', 'NA', 'OC1', 'RU', 'TEST', 'TR', 'PBE']
         SystemYaml.client_config = {key: 'https://clientconfig.rpg.riotgames.com' for key in SystemYaml.regions}
         SystemYaml.email = {key: 'https://email-verification.riotgames.com' for key in SystemYaml.regions}
         SystemYaml.entitlements = {key: 'https://entitlements.auth.riotgames.com' for key in SystemYaml.regions}
-        SystemYaml.chat = {'BR': 'br.chat.si.riotgames.com:5223', 'EUNE': 'eun1.chat.si.riotgames.com:5223', 'EUW': 'euw1.chat.si.riotgames.com:5223', 'JP': 'jp1.chat.si.riotgames.com:5223', 'LA1': 'la1.chat.si.riotgames.com:5223', 'LA2': 'la2.chat.si.riotgames.com:5223', 'ME1': 'me1.chat.si.riotgames.com:5223', 'NA': 'na2.chat.si.riotgames.com:5223', 'OC1': 'oc1.chat.si.riotgames.com:5223', 'RU': 'ru1.chat.si.riotgames.com:5223', 'TEST': 'na2.chat.si.riotgames.com:5223', 'TR': 'tr1.chat.si.riotgames.com:5223'}
-        SystemYaml.ledge = {'BR': 'https://br-red.lol.sgp.pvp.net', 'EUNE': 'https://eune-red.lol.sgp.pvp.net', 'EUW': 'https://euw-red.lol.sgp.pvp.net', 'JP': 'https://jp-red.lol.sgp.pvp.net', 'LA1': 'https://las-red.lol.sgp.pvp.net', 'LA2': 'https://lan-red.lol.sgp.pvp.net', 'ME1': 'https://me1-red.lol.sgp.pvp.net', 'NA': 'https://na-red.lol.sgp.pvp.net', 'OC1': 'https://oce-red.lol.sgp.pvp.net', 'RU': 'https://ru-red.lol.sgp.pvp.net', 'TEST': 'https://na-red.lol.sgp.pvp.net', 'TR': 'https://tr-red.lol.sgp.pvp.net'}
-        SystemYaml.lcds = {'BR': 'feapp.br1.lol.pvp.net:2099', 'EUNE': 'feapp.eun1.lol.pvp.net:2099', 'EUW': 'feapp.euw1.lol.pvp.net:2099', 'JP': 'feapp.jp1.lol.pvp.net:2099', 'LA1': 'feapp.la1.lol.pvp.net:2099', 'LA2': 'feapp.la2.lol.pvp.net:2099', 'ME1': 'feapp.me1.lol.pvp.net:2099', 'NA': 'feapp.na1.lol.pvp.net:2099', 'OC1': 'feapp.oc1.lol.pvp.net:2099', 'RU': 'feapp.ru.lol.pvp.net:2099', 'TEST': 'feapp.na1.lol.pvp.net:2099', 'TR': 'feapp.tr1.lol.pvp.net:2099'}
-        SystemYaml.payments = {'BR': 'https://plstore.br.lol.riotgames.com', 'EUNE': 'https://plstore.eun1.lol.riotgames.com', 'EUW': 'https://plstore.euw1.lol.riotgames.com', 'JP': 'https://plstore.jp1.lol.riotgames.com', 'LA1': 'https://plstore2.la1.lol.riotgames.com', 'LA2': 'https://plstore2.la2.lol.riotgames.com', 'ME1': 'https://plstore.me1.lol.riotgames.com', 'NA': 'https://plstore2.na.lol.riotgames.com', 'OC1': 'https://plstore.oc1.lol.riotgames.com', 'RU': 'https://plstore.ru.lol.riotgames.com', 'TEST': 'https://plstore2.na.lol.riotgames.com', 'TR': 'https://plstore.tr.lol.riotgames.com'}
-        SystemYaml.player_platform = {'BR': 'https://usw2-red.pp.sgp.pvp.net', 'EUNE': 'https://euc1-red.pp.sgp.pvp.net', 'EUW': 'https://euc1-red.pp.sgp.pvp.net', 'JP': 'https://apne1-red.pp.sgp.pvp.net', 'LA1': 'https://usw2-red.pp.sgp.pvp.net', 'LA2': 'https://usw2-red.pp.sgp.pvp.net', 'ME1': 'https://euc1-red.pp.sgp.pvp.net', 'NA': 'https://usw2-red.pp.sgp.pvp.net', 'OC1': 'https://usw2-red.pp.sgp.pvp.net', 'RU': 'https://euc1-red.pp.sgp.pvp.net', 'TEST': 'https://usw2-red.pp.sgp.pvp.net', 'TR': 'https://euc1-red.pp.sgp.pvp.net'}
-        SystemYaml.rms = {'BR': 'wss://us.edge.rms.si.riotgames.com:443', 'EUNE': 'wss://eu.edge.rms.si.riotgames.com:443', 'EUW': 'wss://eu.edge.rms.si.riotgames.com:443', 'JP': 'wss://asia.edge.rms.si.riotgames.com:443', 'LA1': 'wss://us.edge.rms.si.riotgames.com:443', 'LA2': 'wss://us.edge.rms.si.riotgames.com:443', 'ME1': 'wss://eu.edge.rms.si.riotgames.com:443', 'NA': 'wss://us.edge.rms.si.riotgames.com:443', 'OC1': 'wss://us.edge.rms.si.riotgames.com:443', 'RU': 'wss://eu.edge.rms.si.riotgames.com:443', 'TEST': 'wss://us.edge.rms.si.riotgames.com:443', 'TR': 'wss://eu.edge.rms.si.riotgames.com:443'}
+        SystemYaml.chat = {'BR': 'br.chat.si.riotgames.com:5223', 'EUNE': 'eun1.chat.si.riotgames.com:5223', 'EUW': 'euw1.chat.si.riotgames.com:5223', 'JP': 'jp1.chat.si.riotgames.com:5223', 'LA1': 'la1.chat.si.riotgames.com:5223', 'LA2': 'la2.chat.si.riotgames.com:5223', 'ME1': 'me1.chat.si.riotgames.com:5223', 'NA': 'na2.chat.si.riotgames.com:5223', 'OC1': 'oc1.chat.si.riotgames.com:5223', 'RU': 'ru1.chat.si.riotgames.com:5223', 'TEST': 'na2.chat.si.riotgames.com:5223', 'TR': 'tr1.chat.si.riotgames.com:5223', 'PBE': 'not-used.chat.si.riotgames.com:5223'}
+        SystemYaml.ledge = {'BR': 'https://br-red.lol.sgp.pvp.net', 'EUNE': 'https://eune-red.lol.sgp.pvp.net', 'EUW': 'https://euw-red.lol.sgp.pvp.net', 'JP': 'https://jp-red.lol.sgp.pvp.net', 'LA1': 'https://las-red.lol.sgp.pvp.net', 'LA2': 'https://lan-red.lol.sgp.pvp.net', 'ME1': 'https://me1-red.lol.sgp.pvp.net', 'NA': 'https://na-red.lol.sgp.pvp.net', 'OC1': 'https://oce-red.lol.sgp.pvp.net', 'RU': 'https://ru-red.lol.sgp.pvp.net', 'TEST': 'https://na-red.lol.sgp.pvp.net', 'TR': 'https://tr-red.lol.sgp.pvp.net', 'PBE': 'https://pbe-red.lol.sgp.pvp.net'}
+        SystemYaml.lcds = {'BR': 'feapp.br1.lol.pvp.net:2099', 'EUNE': 'feapp.eun1.lol.pvp.net:2099', 'EUW': 'feapp.euw1.lol.pvp.net:2099', 'JP': 'feapp.jp1.lol.pvp.net:2099', 'LA1': 'feapp.la1.lol.pvp.net:2099', 'LA2': 'feapp.la2.lol.pvp.net:2099', 'ME1': 'feapp.me1.lol.pvp.net:2099', 'NA': 'feapp.na1.lol.pvp.net:2099', 'OC1': 'feapp.oc1.lol.pvp.net:2099', 'RU': 'feapp.ru.lol.pvp.net:2099', 'TEST': 'feapp.na1.lol.pvp.net:2099', 'TR': 'feapp.tr1.lol.pvp.net:2099', 'PBE': 'feapp.pbe1.lol.pvp.net:2099'}
+        SystemYaml.payments = {'BR': 'https://plstore.br.lol.riotgames.com', 'EUNE': 'https://plstore.eun1.lol.riotgames.com', 'EUW': 'https://plstore.euw1.lol.riotgames.com', 'JP': 'https://plstore.jp1.lol.riotgames.com', 'LA1': 'https://plstore2.la1.lol.riotgames.com', 'LA2': 'https://plstore2.la2.lol.riotgames.com', 'ME1': 'https://plstore.me1.lol.riotgames.com', 'NA': 'https://plstore2.na.lol.riotgames.com', 'OC1': 'https://plstore.oc1.lol.riotgames.com', 'RU': 'https://plstore.ru.lol.riotgames.com', 'TEST': 'https://plstore2.na.lol.riotgames.com', 'TR': 'https://plstore.tr.lol.riotgames.com', 'PBE': ''}
+        SystemYaml.player_platform = {'BR': 'https://usw2-red.pp.sgp.pvp.net', 'EUNE': 'https://euc1-red.pp.sgp.pvp.net', 'EUW': 'https://euc1-red.pp.sgp.pvp.net', 'JP': 'https://apne1-red.pp.sgp.pvp.net', 'LA1': 'https://usw2-red.pp.sgp.pvp.net', 'LA2': 'https://usw2-red.pp.sgp.pvp.net', 'ME1': 'https://euc1-red.pp.sgp.pvp.net', 'NA': 'https://usw2-red.pp.sgp.pvp.net', 'OC1': 'https://usw2-red.pp.sgp.pvp.net', 'RU': 'https://euc1-red.pp.sgp.pvp.net', 'TEST': 'https://usw2-red.pp.sgp.pvp.net', 'TR': 'https://euc1-red.pp.sgp.pvp.net', 'PBE': 'https://usw2-red.pp.sgp.pvp.net'}
+        SystemYaml.rms = {'BR': 'wss://us.edge.rms.si.riotgames.com:443', 'EUNE': 'wss://eu.edge.rms.si.riotgames.com:443', 'EUW': 'wss://eu.edge.rms.si.riotgames.com:443', 'JP': 'wss://asia.edge.rms.si.riotgames.com:443', 'LA1': 'wss://us.edge.rms.si.riotgames.com:443', 'LA2': 'wss://us.edge.rms.si.riotgames.com:443', 'ME1': 'wss://eu.edge.rms.si.riotgames.com:443', 'NA': 'wss://us.edge.rms.si.riotgames.com:443', 'OC1': 'wss://us.edge.rms.si.riotgames.com:443', 'RU': 'wss://eu.edge.rms.si.riotgames.com:443', 'TEST': 'wss://us.edge.rms.si.riotgames.com:443', 'TR': 'wss://eu.edge.rms.si.riotgames.com:443', 'PBE': 'wss://us.edge.rms.si.riotgames.com:443'}

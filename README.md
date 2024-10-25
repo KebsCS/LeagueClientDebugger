@@ -9,7 +9,7 @@
 * Fiddler or other HTTP proxy integration
 * Run client with custom command line arguments, eg. LCU on any port you want
 * Custom hosts blocklist to disable telemetry and tracking
-* Disable OpenSSL verification certificate errors and see the client logs
+* Disable OpenSSL verification certificate errors and see the client logs. [See details](https://github.com/KebsCS/LeagueClientDebugger/tree/main/LeagueClientDebugger/LeagueHooker)
 
 
 ## Installation
@@ -18,8 +18,13 @@
 3. Run `cd LeagueClientDebugger`
 4. `pip install -r requirements.txt`
 5. Close all running League and Riot clients
-6. `python main.py`, tested on python 3.9.7 and 3.12.3
+6. `python main.py`, tested on python 3.9, 3.12 and 3.13
 7. Select your server and press the `Launch Client` button 
+
+
+## Development
+- To edit `.ui` files, download [Qt Designer](https://build-system.fman.io/qt-designer-download)
+- Contributions are welcome! Feel free to make a pull request with any changes :-)
 
 
 

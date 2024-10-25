@@ -218,6 +218,13 @@
                </widget>
               </item>
               <item>
+               <widget class="QCheckBox" name="allDisableVanguard">
+                <property name="text">
+                 <string>Disable Vanguard</string>
+                </property>
+               </widget>
+              </item>
+              <item>
                <spacer name="horizontalSpacer_6">
                 <property name="orientation">
                  <enum>Qt::Horizontal</enum>
@@ -1164,6 +1171,7 @@
                 <property name="font">
                  <font>
                   <pointsize>10</pointsize>
+                  <weight>50</weight>
                   <bold>false</bold>
                   <underline>false</underline>
                   <kerning>true</kerning>
@@ -2321,7 +2329,7 @@
           <item>
            <widget class="QTextEdit" name="miscBlocklist">
             <property name="sizePolicy">
-             <sizepolicy hsizetype="Maximum" vsizetype="Expanding">
+             <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
               <horstretch>0</horstretch>
               <verstretch>0</verstretch>
              </sizepolicy>
@@ -2504,11 +2512,10 @@
               </property>
               <property name="html">
                <string>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;meta charset=&quot;utf-8&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
 p, li { white-space: pre-wrap; }
-hr { height: 1px; border-width: 0; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'Segoe UI'; font-size:9pt; font-weight:400; font-style:normal;&quot;&gt;
-&lt;p style=&quot;-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;br /&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+&lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;&quot;&gt;
+&lt;p style=&quot;-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; font-family:'Segoe UI'; font-size:9pt;&quot;&gt;&lt;br /&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
               </property>
               <property name="acceptRichText">
                <bool>false</bool>
@@ -2612,6 +2619,8 @@ hr { height: 1px; border-width: 0; }
      <string>Tools</string>
     </property>
     <addaction name="actionOptions"/>
+    <addaction name="separator"/>
+    <addaction name="actionForce_Close_Clients"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuTools"/>
@@ -2631,7 +2640,7 @@ hr { height: 1px; border-width: 0; }
   </action>
   <action name="actionChoose_directory">
    <property name="text">
-    <string>Choose directory</string>
+    <string>Choose directory...</string>
    </property>
   </action>
   <action name="actionStay_on_top">
@@ -2652,12 +2661,22 @@ hr { height: 1px; border-width: 0; }
   </action>
   <action name="actionOptions">
    <property name="text">
-    <string>Options</string>
+    <string>Options...</string>
    </property>
   </action>
   <action name="actionSave_all_requests">
    <property name="text">
     <string>All requests</string>
+   </property>
+  </action>
+  <action name="actionKillClients">
+   <property name="text">
+    <string>Kill Clients</string>
+   </property>
+  </action>
+  <action name="actionForce_Close_Clients">
+   <property name="text">
+    <string>Force close clients</string>
    </property>
   </action>
  </widget>

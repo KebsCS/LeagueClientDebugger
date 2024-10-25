@@ -153,7 +153,7 @@ class ConfigProxy:
 
             # -------------- Important below
 
-            if UiObjects.optionsDisableVanguard.isChecked():
+            if UiObjects.allDisableVanguard.isChecked():
                 replace_value("lol.client_settings.vanguard.enabled", False)
                 # replace_value("lol.client_settings.vanguard.url", "")
                 replace_value("anticheat.vanguard.enabled", False)
