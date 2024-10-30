@@ -140,6 +140,7 @@ class SystemYaml:
 
     @staticmethod
     def set_default_values():
+        #todo, use https://raw.communitydragon.org/latest/system.yaml instead and append missing ones, like pbe
         SystemYaml.regions = ['BR', 'EUNE', 'EUW', 'JP', 'LA1', 'LA2', 'ME1', 'NA', 'OC1', 'RU', 'TEST', 'TR', 'PBE']
         SystemYaml.client_config = {key: 'https://clientconfig.rpg.riotgames.com' for key in SystemYaml.regions}
         SystemYaml.email = {key: 'https://email-verification.riotgames.com' for key in SystemYaml.regions}

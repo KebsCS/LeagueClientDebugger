@@ -29,6 +29,14 @@ class ProxyServers:
     rms_port = 0
     rtmp_port = 0
 
+    player_platform_new_servers = {
+        "https://usw2-red.pp.sgp.pvp.net": 0,
+        "https://apse1-red.pp.sgp.pvp.net": 0,
+        "https://euc1-red.pp.sgp.pvp.net": 0,
+        "https://apne1-red.pp.sgp.pvp.net": 0
+    }
+    player_platform_uses_new = False
+
     loyalty_servers = {
         "https://kr.lers.loyalty.riotgames.com": 0,
         "https://latam.lers.loyalty.riotgames.com": 0,

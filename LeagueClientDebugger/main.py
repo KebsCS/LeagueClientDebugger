@@ -298,7 +298,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                 print("DLL file not found:", dll_path)
                 return
             file = pymem.Pymem("LeagueClient.exe")
-            pymem.process.inject_dll(file.process_handle, bytes(dll_path, "UTF-8"))
+            pymem.process.inject_dll_from_path(file.process_handle, dll_path)
         except Exception as e:
             print("Inject failed ", e)
 
@@ -808,7 +808,12 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
 
             self.start_proxy(SystemYaml.ledge[selected_region], ProxyServers.ledge_port)
             self.start_proxy(SystemYaml.entitlements[selected_region], ProxyServers.entitlements_port)
-            self.start_proxy(SystemYaml.player_platform[selected_region], ProxyServers.player_platform_port)
+            if SystemYaml.player_platform[selected_region] in ProxyServers.player_platform_new_servers:
+                ProxyServers.player_platform_uses_new = True
+            else:
+                self.start_proxy(SystemYaml.player_platform[selected_region], ProxyServers.player_platform_port)
+            for server in ProxyServers.player_platform_new_servers:
+                self.start_proxy(server, ProxyServers.player_platform_new_servers[server])
             self.start_proxy(SystemYaml.email[selected_region], ProxyServers.email_port)
             self.start_proxy(SystemYaml.payments[selected_region], ProxyServers.payments_port)
 

@@ -1,6 +1,7 @@
 .vs/
 x64/Release/LeagueHooker.iobj
 x64/Release/LeagueHooker.ipdb
+x64/Release/LeagueHooker.pdb
 x64/Debug/
 Debug/
 Release/

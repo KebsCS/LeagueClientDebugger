@@ -11,8 +11,13 @@ class RmsProxy:
 
     def __init__(self, real_host):  # wss://eu.edge.rms.si.riotgames.com:443
         parts = real_host.split(":")
-        self.real_host = ":".join(parts[:2])    # wss://eu.edge.rms.si.riotgames.com
-        self.real_port = parts[-1]
+        if len(parts) == 2:
+            self.real_host = real_host
+            self.real_port = "443"
+        else:
+            self.real_host = ":".join(parts[:2])
+            self.real_port = parts[-1]
+        self.real_host = self.real_host.rstrip("/") # wss://eu.edge.rms.si.riotgames.com
 
     async def handle_connection(self, ws, path):
         target_hostname = self.real_host

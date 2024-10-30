@@ -41,7 +41,11 @@ class ConfigProxy:
             config = config.replace("https://content.publishing.riotgames.com",
                                     f"http://localhost:{ProxyServers.publishing_content_port}")
 
-            config = re.sub(r"https://\w+-\w+\.pp\.sgp\.pvp\.net", f"http://localhost:{ProxyServers.player_platform_port}", config) #pp.sgp.pvp.net
+            if not ProxyServers.player_platform_uses_new:
+                config = re.sub(r"https://\w+-\w+\.pp\.sgp\.pvp\.net", f"http://localhost:{ProxyServers.player_platform_port}", config) #pp.sgp.pvp.net
+
+            for server in ProxyServers.player_platform_new_servers:
+                config = config.replace(server, f"http://localhost:{ProxyServers.player_platform_new_servers[server]}")
 
             config = re.sub(r"https://\w+\.ledge\.leagueoflegends\.com",
                             f"http://localhost:{ProxyServers.ledge_port}", config)
@@ -211,8 +215,9 @@ class ConfigProxy:
                 replace_value("keystone.rso-authenticator.service_url", f"http://localhost:{ProxyServers.authenticator_port}")
 
             for key in config.keys():
-                if ".player_platform_edge.url" in key:
-                    config[key] = f"http://localhost:{ProxyServers.player_platform_port}"
+                if not ProxyServers.player_platform_uses_new:
+                    if ".player_platform_edge.url" in key:
+                        config[key] = f"http://localhost:{ProxyServers.player_platform_port}"
 
                 if ".league_edge.url" in key:
                     config[key] = f"http://localhost:{ProxyServers.ledge_port}"
