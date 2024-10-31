@@ -769,12 +769,13 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             else:
                 item.setBackground(Qt.transparent)
 
-    def start_proxy(self, original_host, port):
-        if not original_host:
+    def start_http_proxy(self, host, port):
+        if not host or host in ProxyServers.started_proxies:
             return
-        httpProxy = HttpProxy()
+        http_proxy = HttpProxy()
         loop = asyncio.get_event_loop()
-        loop.create_task(httpProxy.run_server("127.0.0.1", port, original_host))
+        loop.create_task(http_proxy.run_server("127.0.0.1", port, host))
+        ProxyServers.started_proxies[host] = port
 
     def start_lcu_ws(self):
         if self.lcu_ws.global_ws:
@@ -789,6 +790,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
 
     @pyqtSlot()
     def on_allLaunchLeague_clicked(self):
+        # todo, remove region selecting - start all proxies from system.yaml
         selected_region = self.allRegions.currentText()
 
         if not self.proxies_started:
@@ -798,66 +800,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
 
             rms_proxy = RmsProxy(SystemYaml.rms[selected_region])
             loop = asyncio.get_event_loop()
-            loop.create_task(rms_proxy.start_proxy())
-
-            rtmp_proxy = RtmpProxy()
-            loop = asyncio.get_event_loop()
-            lcds = SystemYaml.lcds[selected_region]
-            loop.create_task(
-                rtmp_proxy.start_client_proxy("127.0.0.1", ProxyServers.rtmp_port, lcds.split(":")[0], lcds.split(":")[1]))
-
-            self.start_proxy(SystemYaml.ledge[selected_region], ProxyServers.ledge_port)
-            self.start_proxy(SystemYaml.entitlements[selected_region], ProxyServers.entitlements_port)
-            if SystemYaml.player_platform[selected_region] in ProxyServers.player_platform_new_servers:
-                ProxyServers.player_platform_uses_new = True
-            else:
-                self.start_proxy(SystemYaml.player_platform[selected_region], ProxyServers.player_platform_port)
-            for server in ProxyServers.player_platform_new_servers:
-                self.start_proxy(server, ProxyServers.player_platform_new_servers[server])
-            self.start_proxy(SystemYaml.email[selected_region], ProxyServers.email_port)
-            self.start_proxy(SystemYaml.payments[selected_region], ProxyServers.payments_port)
-
-            #todo get all hardcoded urls from config proxy if possible
-            # todo, isnt apne1-red, maybe just a bug
-            #"matchmaking.configuration.base_url_by_affinity": {
-              #  "asia": "https://apne-red.pp.sgp.pvp.net",
-
-            self.start_proxy("https://playerpreferences.riotgames.com", ProxyServers.playerpreferences_port)
-            for server in ProxyServers.playerpreferences_new_servers:
-                self.start_proxy(server, ProxyServers.playerpreferences_new_servers[server])
-            self.start_proxy("https://riot-geo.pas.si.riotgames.com", ProxyServers.geo_port)
-            if not UiObjects.optionsDisableAuth.isChecked():
-                self.start_proxy("https://auth.riotgames.com", ProxyServers.auth_port)
-                self.start_proxy("https://authenticate.riotgames.com", ProxyServers.authenticator_port)
-            self.start_proxy("https://api.account.riotgames.com", ProxyServers.accounts_port)
-            self.start_proxy("https://content.publishing.riotgames.com",
-                             ProxyServers.publishing_content_port)
-
-            self.start_proxy("https://sieve.services.riotcdn.net", ProxyServers.sieve_port)
-            self.start_proxy("https://scd.riotcdn.net", ProxyServers.scd_port)
-
-            for server in ProxyServers.lifecycle_servers:
-                self.start_proxy(server, ProxyServers.lifecycle_servers[server])
-
-            self.start_proxy("https://pft-rndbdev.rdatasrv.net", ProxyServers.pft_port)
-            self.start_proxy("https://data.riotgames.com", ProxyServers.data_riotgames_port)
-
-            for server in ProxyServers.loyalty_servers:
-                self.start_proxy(server, ProxyServers.loyalty_servers[server])
-
-            self.start_proxy("https://pcbs.loyalty.riotgames.com", ProxyServers.pcbs_loyalty_port)
-
-            # lor
-            for server in ProxyServers.lor_login_servers:
-                self.start_proxy(server, ProxyServers.lor_login_servers[server])
-            for server in ProxyServers.lor_services_servers:
-                self.start_proxy(server, ProxyServers.lor_services_servers[server])
-            for server in ProxyServers.lor_spectate_servers:
-                self.start_proxy(server, ProxyServers.lor_spectate_servers[server])
-
-            # valorant, doesnt work, only pvp.net urls are working and theres ssl pinning
-            # for server in ProxyServers.shared_servers:
-            #     self.start_proxy(server, ProxyServers.shared_servers[server])
+            loop.create_task(rms_proxy.start_proxy(ProxyServers.rms_port))
 
             self.proxies_started = True
 
@@ -1315,7 +1258,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                     default_host_blocklist = ("data.riotgames.com\n"
                                               "ekg.riotgames.com\n"
                                               "metric-api.newrelic.com\n"
-                                              "telemetry.sgp.pvp.net")
+                                              "telemetry.sgp.pvp.net\n"
+                                              #"pft.leagueoflegends.com\n"
+                                              )
                     self.miscBlocklist.setText(default_host_blocklist)
 
                 self.on_httpsFiddlerButton_clicked()

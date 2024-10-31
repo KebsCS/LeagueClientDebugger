@@ -109,15 +109,20 @@ class HttpProxy:
         def edit_response(self, response: requests.Response) -> requests.Response:
             if response.url == "https://auth.riotgames.com/.well-known/openid-configuration":
                 response._content = response.text.replace("https://auth.riotgames.com",
-                                                          f"http://localhost:{ProxyServers.auth_port}").encode()
+                                                          f"http://localhost:{ProxyServers.started_proxies['https://auth.riotgames.com']}").encode()
 
-            # CORS fix, storefront required it
-            if response.request.method.upper() == "OPTIONS":# and "storefront" in response.url:
+            # CORS fix
+            if response.request.method.upper() == "OPTIONS":
                 response.raw.status = 200
                 response.status_code = 200
 
-                headers_to_modify = ['access-control-allow-origin', 'access-control-allow-methods',
-                                     'access-control-allow-headers', 'access-control-expose-headers']
+                headers_to_modify = ['Access-Control-Allow-Origin', 'Access-Control-Allow-Methods',
+                                     'Access-Control-Allow-Headers', 'Access-Control-Expose-Headers']
+
+                if "publishing.riotgames.com" in response.url:
+                    for headers_dict in [response.headers, response.raw.headers]:
+                        for header in headers_to_modify:
+                            headers_dict[header] = "*"
 
                 for headers_dict in [response.headers, response.raw.headers]:
                     for header in headers_dict:
@@ -176,7 +181,11 @@ class HttpProxy:
         item.setText(
             f"[{current_time}] {str(response.status_code.real)} {response.request.method} {response.request.url}")
         raw_request = to_raw_request(response.request)
-        item.setData(256, raw_request.decode())
+
+        try:
+            item.setData(256, raw_request.decode())
+        except UnicodeDecodeError:
+            item.setData(256, raw_request.hex())
 
         raw_response_str = raw_response.decode()
         try:

@@ -1,6 +1,5 @@
 import asyncio, websockets, gzip, re, datetime
 
-from ProxyServers import ProxyServers
 from UiObjects import *
 
 
@@ -96,6 +95,6 @@ class RmsProxy:
             UiObjects.rmsList.addItem(item)
 
 
-    async def start_proxy(self):
-        print(f'[RMS] Proxy server started on localhost:{ProxyServers.rms_port}')
-        server = await websockets.serve(self.handle_connection, host="localhost", port=ProxyServers.rms_port)
+    async def start_proxy(self, port):
+        print(f'[RMS] Proxy server started on localhost:{port}')
+        server = await websockets.serve(self.handle_connection, host="localhost", port=port)

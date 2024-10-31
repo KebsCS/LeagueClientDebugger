@@ -1,6 +1,9 @@
-import os
+import os, asyncio, re
 from ruamel import yaml
-from ProxyServers import ProxyServers
+from ProxyServers import ProxyServers, find_free_port
+from HttpProxy import HttpProxy
+from RtmpProxy import RtmpProxy
+from RmsProxy import RmsProxy
 
 
 class SystemYaml:
@@ -96,47 +99,72 @@ class SystemYaml:
     def _edit(path: str):
         if not os.path.exists(path):
             return
-        read_data = None
-        with open(path, 'r', encoding='utf-8') as fp:
-            read_data = yaml.YAML(typ='rt').load(fp)
 
+        with open(path, 'r', encoding='utf-8') as file:
+            content = file.read()
+
+        def match_host_and_start_proxy(text):
+            def start_http_proxy(host, port):
+                if not host or host in ProxyServers.started_proxies:
+                    return
+                http_proxy = HttpProxy()
+                loop = asyncio.get_event_loop()
+                loop.create_task(http_proxy.run_server("127.0.0.1", port, host))
+                ProxyServers.started_proxies[host] = port
+
+            pattern = r"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}"
+            last_end = 0
+            new_text = ""
+            for match in re.finditer(pattern, text):
+                url = match.group(0)
+                if ("localhost" in url or "127.0.0.1" in url or url in ProxyServers.excluded_hosts
+                        or "riotcdn" in url or "vivox" in url or "pbr.leagueoflegends.com" in url or "clientconfig.rpg.riotgames.com" in url
+                        or "support.riotgames.com" in url or "vts.si" in url or "lienminh.vnggames.com" in url):
+                    continue
+
+                if url not in ProxyServers.started_proxies:
+                    port = find_free_port()
+                    start_http_proxy(url, port)
+                new_text += text[last_end:match.start()]
+                new_text += f"http://localhost:{ProxyServers.started_proxies[url]}"
+                last_end = match.end()
+            new_text += text[last_end:]
+            return new_text
+
+        new_content = match_host_and_start_proxy(content)
+
+        read_data = yaml.YAML(typ='rt').load(new_content)
         for region in read_data['region_data']:
             key = read_data['region_data'][region]["servers"]
 
-            # some keys don't exist on different servers
-            def safe_replace_key(key_dict, key_path, dictionary, new_value):
-                try:
-                    key[key_dict][key_path] = key[key_dict][key_path].replace(
-                        dictionary[region], new_value)
-                except KeyError as e:
-                    if (region == "PBE" or region == "PBE_TEST") and (str(e) == "'payments'" or str(e) == "'league_edge'"):
-                        return
-                    print(f"KeyError edit: {e} not found for region {region}")
-                    pass
-
-            safe_replace_key("email_verification", "external_url", SystemYaml.email,
-                             f"http://localhost:{ProxyServers.email_port}")
-            safe_replace_key("entitlements", "entitlements_url", SystemYaml.entitlements,
-                             f"http://localhost:{ProxyServers.entitlements_port}")
-            safe_replace_key("league_edge", "league_edge_url", SystemYaml.ledge,
-                             f"http://localhost:{ProxyServers.ledge_port}")
-            safe_replace_key("payments", "payments_host", SystemYaml.payments,
-                             f"http://localhost:{ProxyServers.payments_port}")
-            safe_replace_key("player_platform_edge", "player_platform_edge_url", SystemYaml.player_platform,
-                             f"http://localhost:{ProxyServers.player_platform_port}")
-
+            lcds_port = find_free_port()
+            rtmp_proxy = RtmpProxy()
+            loop = asyncio.get_event_loop()
             try:
+                loop.create_task(
+                    rtmp_proxy.start_client_proxy("127.0.0.1", lcds_port, key["lcds"]["lcds_host"], str(key["lcds"]["lcds_port"])))
                 key["lcds"]["lcds_host"] = "127.0.0.1"
-                key["lcds"]["lcds_port"] = ProxyServers.rtmp_port
+                key["lcds"]["lcds_port"] = lcds_port
                 key["lcds"]["use_tls"] = False
             except KeyError as e:
                 pass
 
-        # save
+            # todo, client config needs rms.port, find which host's port to replace
+            # try:
+            #     rms_port = find_free_port()
+            #     rms_proxy = RmsProxy(key["rms"]["rms_url"])
+            #     loop = asyncio.get_event_loop()
+            #     loop.create_task(rms_proxy.start_proxy(rms_port))
+            #     ProxyServers.rms_proxies[key["rms"]["rms_url"]] = rms_port
+            # except KeyError as e:
+            #     pass
+
+            # todo, chat, clientconfig
+
         new_path = path.replace('system.yaml', 'Config\\system.yaml')
-        os.makedirs(os.path.dirname(new_path), exist_ok=True) # make the Config folder if it doesn't exist
-        with open(new_path, 'w', encoding='utf-8') as fp:
-            yaml.YAML(typ='rt').dump(read_data, fp)
+        os.makedirs(os.path.dirname(new_path), exist_ok=True)  # make the Config folder if it doesn't exist
+        with open(new_path, 'w', encoding='utf-8') as file:
+            yaml.YAML(typ='rt').dump(read_data, file)
 
     @staticmethod
     def set_default_values():

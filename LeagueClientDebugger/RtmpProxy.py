@@ -380,7 +380,7 @@ class RtmpProxy:
             lambda: self.ProtocolFromClient(real_host, real_port),
             proxy_host, proxy_port)
 
-        print(f'[RTMP] Proxy server started on {proxy_host}:{proxy_port}')
+        print(f'[RTMP] {real_host} server started on {proxy_host}:{proxy_port}')
 
         async with server:
             await server.serve_forever()

@@ -1,7 +1,7 @@
 import asyncio, requests, re, base64, json
 from ChatProxy import ChatProxy
 from HttpProxy import HttpProxy
-from ProxyServers import ProxyServers
+from ProxyServers import ProxyServers, find_free_port
 from UiObjects import UiObjects
 
 
@@ -26,61 +26,46 @@ class ConfigProxy:
             if response.status_code == 403:
                 raise Exception("Client config Cloudflare blocked, open a github issue or message on discord")
 
+            # todo, move this, repeated code in SystemYaml.py
+            def match_host_and_start_proxy(text):
+                def start_http_proxy(host, port):
+                    if not host or host in ProxyServers.started_proxies:
+                        return
+                    http_proxy = HttpProxy()
+                    loop = asyncio.get_event_loop()
+                    loop.create_task(http_proxy.run_server("127.0.0.1", port, host))
+                    ProxyServers.started_proxies[host] = port
+
+                pattern = r"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}"
+                last_end = 0
+                new_text = ""
+                for match in re.finditer(pattern, text):
+                    url = match.group(0)
+                    if ("localhost" in url or "127.0.0.1" in url or url in ProxyServers.excluded_hosts
+                            or "riotcdn" in url or "%1" in url or "clientconfig.rpg.riotgames.com" in url # broken urls
+                            or "shared." in url): # valorant
+                        continue
+                    if UiObjects.optionsDisableAuth.isChecked():
+                        if "https://auth.riotgames.com" == url or "https://authenticate.riotgames.com" == url:
+                            continue
+
+                    if url not in ProxyServers.started_proxies:
+                        port = find_free_port()
+                        start_http_proxy(url, port)
+                    new_text += text[last_end:match.start()]
+                    new_text += f"http://localhost:{ProxyServers.started_proxies[url]}"
+                    last_end = match.end()
+                new_text += text[last_end:]
+                return new_text
+
             original_config = response.json()
             config = json.dumps(self.edit_config(original_config))
-
-            config = config.replace("https://playerpreferences.riotgames.com",
-                                    f"http://localhost:{ProxyServers.playerpreferences_port}")
-
-            for server in ProxyServers.playerpreferences_new_servers:
-                config = config.replace(server, f"http://localhost:{ProxyServers.playerpreferences_new_servers[server]}")
-
-            config = config.replace("https://api.account.riotgames.com",
-                                    f"http://localhost:{ProxyServers.accounts_port}")
-
-            config = config.replace("https://content.publishing.riotgames.com",
-                                    f"http://localhost:{ProxyServers.publishing_content_port}")
-
-            if not ProxyServers.player_platform_uses_new:
-                config = re.sub(r"https://\w+-\w+\.pp\.sgp\.pvp\.net", f"http://localhost:{ProxyServers.player_platform_port}", config) #pp.sgp.pvp.net
-
-            for server in ProxyServers.player_platform_new_servers:
-                config = config.replace(server, f"http://localhost:{ProxyServers.player_platform_new_servers[server]}")
-
-            config = re.sub(r"https://\w+\.ledge\.leagueoflegends\.com",
-                            f"http://localhost:{ProxyServers.ledge_port}", config)
-
-            config = config.replace("https://sieve.services.riotcdn.net",
-                                    f"http://localhost:{ProxyServers.sieve_port}")
-
-            config = config.replace("https://scd.riotcdn.net",
-                                    f"http://localhost:{ProxyServers.scd_port}")
-
-            for server in ProxyServers.lifecycle_servers:
-                config = config.replace(server, f"http://localhost:{ProxyServers.lifecycle_servers[server]}")
-
-            for server in ProxyServers.loyalty_servers:
-                config = config.replace(server, f"http://localhost:{ProxyServers.loyalty_servers[server]}")
-
-            config = config.replace("https://pcbs.loyalty.riotgames.com",
-                                    f"http://localhost:{ProxyServers.pcbs_loyalty_port}")
+            config = match_host_and_start_proxy(config)
 
             config = re.sub(r"(wss://([a-z]{2,4})\.edge\.rms\.si\.riotgames\.com)",
                             f"ws://127.0.0.1", config)
 
             #todo "payments.pay_plugin.pmc-edge-url-template": "https://edge.%1.pmc.pay.riotgames.com",
-
-            # lor
-            for server in ProxyServers.lor_login_servers:
-                config = config.replace(server, f"http://localhost:{ProxyServers.lor_login_servers[server]}")
-            for server in ProxyServers.lor_services_servers:
-                config = config.replace(server, f"http://localhost:{ProxyServers.lor_services_servers[server]}")
-            for server in ProxyServers.lor_spectate_servers:
-                config = config.replace(server, f"http://localhost:{ProxyServers.lor_spectate_servers[server]}")
-
-            # # valorant, replacing shared with localhost doesnt work, whitelisted for pvp.net
-            # for server in ProxyServers.shared_servers:
-            #     config = config.replace(server, f"http://127.0.0.1:{ProxyServers.shared_servers[server]}")
 
             #print(config)
             response._content = config.encode()
@@ -182,56 +167,30 @@ class ConfigProxy:
             replace_value("rms.allow_bad_cert.enabled", True)
             replace_value("rms.port", str(ProxyServers.rms_port))
 
-            replace_value("rndb.client_settings.pft_host", f"localhost:{ProxyServers.pft_port}")
-            replace_value("rndb.client_settings.ap_collector_dns_record", f"http://localhost:{ProxyServers.data_riotgames_port}")
+            def override_system_yaml(patchline: str):
+                if patchline in config:
+                    if "platforms" in config[patchline]:
+                        for node in config[patchline]["platforms"]["win"]["configurations"]:
+                            if not node:
+                                continue
+                            if "arguments" in node["launcher"]:
+                                if UiObjects.allCheckboxLC.isChecked():
+                                    node["launcher"]["arguments"] = ['--' + arg.strip() for arg in UiObjects.allTextLCArgs.toPlainText().split('--') if arg.strip()]
+                                node["launcher"]["arguments"].append('--system-yaml-override="Config/system.yaml"')
 
-            if "keystone.products.league_of_legends.patchlines.live" in config:
-                if "platforms" in config["keystone.products.league_of_legends.patchlines.live"]:
-                    for node in config["keystone.products.league_of_legends.patchlines.live"]["platforms"]["win"]["configurations"]:
-                        if not node:
-                            continue
-                        if "arguments" in node["launcher"]:
-                            if UiObjects.allCheckboxLC.isChecked():
-                                node["launcher"]["arguments"] = ['--' + arg.strip() for arg in UiObjects.allTextLCArgs.toPlainText().split('--') if arg.strip()]
-                            node["launcher"]["arguments"].append('--system-yaml-override="Config/system.yaml"')
+                            if "launchable_on_update_fail" in node:
+                                node["launchable_on_update_fail"] = True
 
-                        if "launchable_on_update_fail" in node:
-                            node["launchable_on_update_fail"] = True
-
-            if "keystone.products.league_of_legends.patchlines.pbe" in config:
-                if "platforms" in config["keystone.products.league_of_legends.patchlines.pbe"]:
-                    for node in config["keystone.products.league_of_legends.patchlines.pbe"]["platforms"]["win"]["configurations"]:
-                        if not node:
-                            continue
-                        if "arguments" in node["launcher"]:
-                            if UiObjects.allCheckboxLC.isChecked():
-                                node["launcher"]["arguments"] = ['--' + arg.strip() for arg in UiObjects.allTextLCArgs.toPlainText().split('--') if arg.strip()]
-                            node["launcher"]["arguments"].append('--system-yaml-override="Config/system.yaml"')
-
-                        if "launchable_on_update_fail" in node:
-                            node["launchable_on_update_fail"] = True
-            if not UiObjects.optionsDisableAuth.isChecked():
-                replace_value("keystone.rso_auth.url", f"http://localhost:{ProxyServers.auth_port}")
-                replace_value("keystone.rso-authenticator.service_url", f"http://localhost:{ProxyServers.authenticator_port}")
+            override_system_yaml("keystone.products.league_of_legends.patchlines.live")
+            override_system_yaml("keystone.products.league_of_legends.patchlines.pbe")
 
             for key in config.keys():
-                if not ProxyServers.player_platform_uses_new:
-                    if ".player_platform_edge.url" in key:
-                        config[key] = f"http://localhost:{ProxyServers.player_platform_port}"
-
-                if ".league_edge.url" in key:
-                    config[key] = f"http://localhost:{ProxyServers.ledge_port}"
-
                 if ".use_ledge" in key:
                     config[key] = True
-
-            if "keystone.entitlements.url" in config:
-                config["keystone.entitlements.url"] = re.sub(r'^(https?://[^/]+)', f"http://localhost:{ProxyServers.entitlements_port}", config["keystone.entitlements.url"])
 
             if "keystone.player-affinity.playerAffinityServiceURL" in config:
                 if ConfigProxy.geo_pas_url == "":
                     ConfigProxy.geo_pas_url = config["keystone.player-affinity.playerAffinityServiceURL"] + "/pas/v1/service/chat"
-                config["keystone.player-affinity.playerAffinityServiceURL"] = f"http://localhost:{ProxyServers.geo_port}"
 
             replace_value("chat.use_tls.enabled", False)
             replace_value("chat.host", "127.0.0.1")
