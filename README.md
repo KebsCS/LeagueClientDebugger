@@ -16,9 +16,9 @@
 1. Clone or download the repository
 2. Open Windows Command Prompt (**CMD**)
 3. Run `cd LeagueClientDebugger`
-4. `pip install -r requirements.txt`
+4. `python3 -m pip install -r requirements.txt`
 5. Close all running League and Riot clients
-6. `python main.py`, tested on python 3.9, 3.12 and 3.13
+6. `python3 main.py`, tested on python 3.9, 3.12 and 3.13
 7. Select your server and press the `Launch Client` button 
 
 

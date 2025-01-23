@@ -1,7 +1,7 @@
 from DetachableTabWidget import DetachableTabWidget
 from PyQt5 import QtWidgets
 QtWidgets.QTabWidget = DetachableTabWidget
-import sys, json, time, os, io, asyncio, pymem, requests, gzip, re, base64, datetime, psutil, ctypes, shutil
+import sys, json, time, os, io, asyncio, pymem, requests, gzip, re, base64, datetime, psutil, ctypes, shutil, platform
 from lxml import etree
 from PyQt5.uic import loadUiType # PyCharm bug, import works fine
 from PyQt5.QtCore import pyqtSlot, pyqtSignal, Qt, QEvent, QByteArray, QSize
@@ -83,6 +83,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         dialog_ui = Ui_Dialog()
         dialog_ui.setupUi(self.options_dialog)
         self.options_dialog.setWindowFlags(self.options_dialog.windowFlags() & ~Qt.WindowContextHelpButtonHint | Qt.WindowCloseButtonHint)
+
+        dialog_ui.optionsResetArgs.clicked.connect(lambda : (self.ResetRCArgs(), self.ResetLCArgs()))
 
         UiObjects.optionsDarkMode = dialog_ui.optionsDarkMode
         self.default_palette = QApplication.palette()
@@ -176,6 +178,13 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                 print("Restarting as admin")
                 ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
                 exit(1)
+
+        if platform.system() == "Darwin":
+            UiObjects.optionsEnableInject.setChecked(False)
+            UiObjects.optionsEnableInject.hide()
+
+            UiObjects.optionsRunAsAdmin.setChecked(False)
+            UiObjects.optionsRunAsAdmin.hide()
 
         self.miscBlocklistLabel.setText(f"Hosts blocklist {'(Active)' if self.blocklist_enabled else ''}")
         self.miscTextDate.setText(str(datetime.datetime.fromtimestamp(self.startTime).strftime('%Y-%m-%d %H:%M:%S')))
@@ -810,15 +819,28 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         if self.rcEnabled.isChecked():
             self.start_rc_ws()
 
-        with open(os.getenv('PROGRAMDATA', r"C:\ProgramData") + r"\Riot Games\RiotClientInstalls.json", 'r', encoding='utf-8') as file: # RiotClientServices.exe
+        riot_client_path = ""
+        if platform.system() == "Windows":
+            riot_client_path = os.getenv('PROGRAMDATA', r"C:\ProgramData") + r"\Riot Games\RiotClientInstalls.json"
+        elif platform.system() == "Darwin":
+            riot_client_path = "/Users/Shared/Riot Games/RiotClientInstalls.json"
+
+        with open(riot_client_path, 'r', encoding='utf-8') as file: # RiotClientServices.exe
             clientPath = json.load(file)["rc_default"]
             league = QProcess(None)
 
             args_list = ['--' + arg.strip() for arg in self.allTextRCArgs.toPlainText().split('--') if arg.strip()]
             args_list += [f'--client-config-url=http://127.0.0.1:{ProxyServers.client_config_port}']
+            if "(Esports)" in clientPath: # url is in rc's system.yaml, for normal client's it's in client config
+                args_list += [f'--rso-auth.url=http://localhost:{ProxyServers.auth_port}']
+
             if '--launch-patchline' not in self.allTextRCArgs.toPlainText():
-                patchline = '--launch-patchline=' + ('pbe' if 'PBE' in selected_region else 'live')
-                args_list += [patchline]
+                if "(Esports)" in clientPath:
+                    args_list += [f"--launch-patchline={selected_region.lower()}", f"--region={selected_region}"]
+                else:
+                    patchline = '--launch-patchline=' + ('pbe' if 'PBE' in selected_region else 'live')
+                    args_list += [patchline]
+
             print(f"Launched {clientPath} {args_list}")
             league.startDetached(clientPath, args_list)
 
@@ -1046,6 +1068,10 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
 
     @pyqtSlot()
     def on_miscButtonActivate_clicked(self):
+        if platform.system() == "Darwin":
+            QMessageBox.about(self, "Not supported", "Not supported on MacOS")
+            return
+
         hostmap = {}
         for line in self.miscBlocklist.toPlainText().splitlines():
             stripped_line = line.strip()
@@ -1093,6 +1119,15 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             self.miscTextTimestamp.setText(f"{int(date_object.timestamp())}")
         except Exception as e:
             print(f"Error: {e}. The provided date is not valid.")
+
+    def ResetLCArgs(self):
+        self.allTextLCArgs.setPlainText(
+            "--no-rads --disable-self-update --locale={locale} --rga-lite "
+            "--riotgamesapi-standalone --riotgamesapi-settings={settings-token} "
+            "--riotclient-auth-token={remoting-auth-token} --riotclient-app-port={remoting-app-port}")
+
+    def ResetRCArgs(self):
+        self.allTextRCArgs.setPlainText("--allow-multiple-clients")
 
     #region Config
     def LoadConfig(self):
@@ -1236,15 +1271,12 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                 if "allTextRCArgs" in data:
                     self.allTextRCArgs.setPlainText(data["allTextRCArgs"])
                 else:
-                    self.allTextRCArgs.setPlainText("--allow-multiple-clients")
+                    self.ResetRCArgs()
 
                 if "allTextLCArgs" in data:
                     self.allTextLCArgs.setPlainText(data["allTextLCArgs"])
                 else:
-                    self.allTextLCArgs.setPlainText(
-                        "--no-rads --disable-self-update --locale={locale} --rga-lite "
-                        "--riotgamesapi-standalone --riotgamesapi-settings={settings-token} "
-                        "--riotclient-auth-token={remoting-auth-token} --riotclient-app-port={remoting-app-port}")
+                    self.ResetLCArgs()
 
                 if "allCheckboxLC" in data:
                     self.allCheckboxLC.setChecked(data["allCheckboxLC"])

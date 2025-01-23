@@ -14,6 +14,9 @@ class ProxyServers:
     chat_port = 0
     rms_port = 0
 
+    # needed in esports to overwrite launch arg
+    auth_port = 0
+
     rms_proxies = {}
 
     started_proxies = {}

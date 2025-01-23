@@ -1,4 +1,4 @@
-import asyncio, ssl, copy, gzip, base64, datetime
+import asyncio, ssl, copy, gzip, base64, datetime, platform
 from UiObjects import *
 from rtmp.ByteStreamReader import ByteStreamReader
 from rtmp.Amf0 import Amf0Decoder, Amf0Encoder, Amf0Amf3
@@ -229,7 +229,7 @@ class RtmpParser:
             elif packet.header.message_type_id == 0x01:     # Set Chunk Size
                 pass #etc todo
             else:
-                print("[RTMP] not amf3 or amf0")
+                print("[RTMP] Error, not amf3 or amf0: ", packet.buffer)
                 pass
                 #raise Exception("[RTMP] Unhandled message type")
         else:
@@ -360,10 +360,13 @@ class RtmpProxy:
         async def connect_to_real_server(self, real_host, real_port, league_client, first_req):
             loop = asyncio.get_event_loop()
             on_con_lost = loop.create_future()
-
+            if platform.system() == "Windows":
+                ssl_context = ssl.SSLContext(protocol=ssl.PROTOCOL_TLSv1_2)
+            elif platform.system() == "Darwin":
+                ssl_context = ssl._create_unverified_context()
             transport, protocol = await loop.create_connection(
                 lambda: ProtocolFromServer(on_con_lost, league_client, first_req),
-                real_host, real_port, ssl=ssl.SSLContext(protocol=ssl.PROTOCOL_TLSv1_2))
+                real_host, real_port, ssl=ssl_context)
 
             self.real_server = transport
             self.is_connected = True

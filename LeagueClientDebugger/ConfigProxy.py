@@ -1,4 +1,4 @@
-import asyncio, requests, re, base64, json
+import asyncio, requests, re, base64, json, platform
 from ChatProxy import ChatProxy
 from HttpProxy import HttpProxy
 from ProxyServers import ProxyServers, find_free_port
@@ -42,7 +42,7 @@ class ConfigProxy:
                 for match in re.finditer(pattern, text):
                     url = match.group(0)
                     if ("localhost" in url or "127.0.0.1" in url or url in ProxyServers.excluded_hosts
-                            or "riotcdn" in url or "%1" in url or "clientconfig.rpg.riotgames.com" in url # broken urls
+                            or "riotcdn" in url or "%1" in url or "clientconfig.rpg.riotgames.com" in url or "youtube.com" in url# broken urls
                             or "shared." in url): # valorant
                         continue
                     if UiObjects.optionsDisableAuth.isChecked():
@@ -63,6 +63,9 @@ class ConfigProxy:
             config = match_host_and_start_proxy(config)
 
             config = re.sub(r"(wss://([a-z]{2,4})\.edge\.rms\.si\.riotgames\.com)",
+                            f"ws://127.0.0.1", config)
+
+            config = re.sub(r"(wss://([a-z0-9]{2,4})-rms-edge\.esports\.rpg\.riotgames\.com)",
                             f"ws://127.0.0.1", config)
 
             #todo "payments.pay_plugin.pmc-edge-url-template": "https://edge.%1.pmc.pay.riotgames.com",
@@ -144,13 +147,20 @@ class ConfigProxy:
 
             if UiObjects.allDisableVanguard.isChecked():
                 replace_value("lol.client_settings.vanguard.enabled", False)
+                replace_value("lol.client_settings.vanguard.enabled_embedded", False)
                 # replace_value("lol.client_settings.vanguard.url", "")
                 replace_value("anticheat.vanguard.enabled", False)
+                replace_value("anticheat.vanguard.backgroundInstall", False)
+                replace_value("anticheat.vanguard.enforceExactVersionMatching", False)
 
                 def remove_vg_dependency(patchline: str):
+                    if platform.system() == "Windows":
+                        platforms = "win"
+                    elif platform.system() == "Darwin":
+                        platforms = "mac"
                     if patchline in config:
-                        if "platforms" in config[patchline]:
-                            for node in config[patchline]["platforms"]["win"]["configurations"]:
+                        if "platforms" in config[patchline] and platforms in config[patchline]["platforms"]:
+                            for node in config[patchline]["platforms"][platforms]["configurations"]:
                                 if not node:
                                     continue
                                 if "dependencies" in node:
@@ -160,33 +170,39 @@ class ConfigProxy:
                                             continue
                                         if "id" in deps and deps["id"] == "vanguard":
                                             node["dependencies"].remove(deps)
-                remove_vg_dependency("keystone.products.league_of_legends.patchlines.live")
-                remove_vg_dependency("keystone.products.league_of_legends.patchlines.pbe")
+
                 remove_vg_dependency("keystone.products.valorant.patchlines.live")
+                for key in config.keys():
+                    if "keystone.products.league_of_legends.patchlines." in key:
+                        remove_vg_dependency(key)
 
             replace_value("rms.allow_bad_cert.enabled", True)
             replace_value("rms.port", str(ProxyServers.rms_port))
 
             def override_system_yaml(patchline: str):
+                if platform.system() == "Windows":
+                    platforms = "win"
+                elif platform.system() == "Darwin":
+                    platforms = "mac"
                 if patchline in config:
-                    if "platforms" in config[patchline]:
-                        for node in config[patchline]["platforms"]["win"]["configurations"]:
+                    if "platforms" in config[patchline] and platforms in config[patchline]["platforms"]:
+                        for node in config[patchline]["platforms"][platforms]["configurations"]:
                             if not node:
                                 continue
                             if "arguments" in node["launcher"]:
                                 if UiObjects.allCheckboxLC.isChecked():
                                     node["launcher"]["arguments"] = ['--' + arg.strip() for arg in UiObjects.allTextLCArgs.toPlainText().split('--') if arg.strip()]
-                                node["launcher"]["arguments"].append('--system-yaml-override="Config/system.yaml"')
+                                node["launcher"]["arguments"].append('--system-yaml-override=Config/system.yaml')
 
                             if "launchable_on_update_fail" in node:
                                 node["launchable_on_update_fail"] = True
 
-            override_system_yaml("keystone.products.league_of_legends.patchlines.live")
-            override_system_yaml("keystone.products.league_of_legends.patchlines.pbe")
-
             for key in config.keys():
                 if ".use_ledge" in key:
                     config[key] = True
+
+                if "keystone.products.league_of_legends.patchlines." in key:
+                    override_system_yaml(key)
 
             if "keystone.player-affinity.playerAffinityServiceURL" in config:
                 if ConfigProxy.geo_pas_url == "":

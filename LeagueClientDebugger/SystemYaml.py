@@ -1,4 +1,4 @@
-import os, asyncio, re
+import os, asyncio, re, glob, platform
 from ruamel import yaml
 from ProxyServers import ProxyServers, find_free_port
 from HttpProxy import HttpProxy
@@ -7,8 +7,7 @@ from RmsProxy import RmsProxy
 
 
 class SystemYaml:
-    path = 'C:\\Riot Games\\League of Legends\\system.yaml'
-    path_pbe = 'C:\\Riot Games\\League of Legends (PBE)\\system.yaml'
+    paths = []
 
     regions = []
     chat = {}
@@ -23,30 +22,42 @@ class SystemYaml:
 
     @staticmethod
     def setup():
-        live_settings = os.getenv('PROGRAMDATA', r"C:\ProgramData") + \
-                        r"\Riot Games\Metadata\league_of_legends.live\league_of_legends.live.product_settings.yaml"
+        if platform.system() == "Windows":
+            base_dir = os.getenv('PROGRAMDATA', r"C:\ProgramData") + r"\Riot Games\Metadata"
+        elif platform.system() == "Darwin":
+            base_dir = "/Users/Shared/Riot Games/Metadata"
 
-        if os.path.exists(live_settings):
-            with open(live_settings, 'r', encoding='utf-8') as file:
-                read_data = yaml.YAML(typ='rt').load(file)
-                SystemYaml.path = read_data['product_install_full_path'] + "\\system.yaml"
+        pattern = os.path.join(base_dir, "league_of_legends.*")
+        for folder in glob.glob(pattern):
+            yaml_path = os.path.join(folder, os.path.basename(folder) + ".product_settings.yaml")
+            if os.path.exists(yaml_path):
+                with open(yaml_path, 'r', encoding='utf-8') as file:
+                    read_data = yaml.YAML(typ='rt').load(file)
+                    if 'product_install_full_path' in read_data:
+                        if platform.system() == "Windows":
+                            SystemYaml.paths.append(read_data['product_install_full_path'] + "/system.yaml")
+                        elif platform.system() == "Darwin":
+                            SystemYaml.paths.append(read_data['product_install_full_path'] + "/Contents/LoL/system.yaml")
 
-        pbe_settings = os.getenv('PROGRAMDATA', r"C:\ProgramData") + \
-                       r"\Riot Games\Metadata\league_of_legends.pbe\league_of_legends.pbe.product_settings.yaml"
-
-        if os.path.exists(pbe_settings):
-            with open(pbe_settings, 'r', encoding='utf-8') as file:
-                read_data = yaml.YAML(typ='rt').load(file)
-                SystemYaml.path_pbe = read_data['product_install_full_path'] + "\\system.yaml"
+        if not SystemYaml.paths:
+            if platform.system() == "Windows":
+                SystemYaml.paths.append('C:\\Riot Games\\League of Legends\\system.yaml')
+                SystemYaml.paths.append('C:\\Riot Games\\League of Legends (PBE)\\system.yaml')
+            elif platform.system() == "Darwin":
+                SystemYaml.paths.append("/Applications/League of Legends.app")
+        else:
+            # live client first
+            SystemYaml.paths = sorted(SystemYaml.paths, key=lambda x: ('League of Legends/system.yaml' not in x, x))
 
     @staticmethod
     def read():
         SystemYaml.setup()
 
-        if not SystemYaml._read(SystemYaml.path):
-            # when league not installed
+        for path in SystemYaml.paths:
+            SystemYaml._read(path)
+
+        if not SystemYaml.regions:
             SystemYaml.set_default_values()
-        SystemYaml._read(SystemYaml.path_pbe)
 
     @staticmethod
     def _read(path: str) -> bool:
@@ -57,6 +68,8 @@ class SystemYaml:
             read_data = yaml.YAML(typ='rt').load(fp)
 
             for region in read_data['region_data']:
+                if region in SystemYaml.regions:
+                    continue
                 SystemYaml.regions.append(region)
                 key = read_data['region_data'][region]["servers"]
 
@@ -73,6 +86,9 @@ class SystemYaml:
                                 dictionary[region] = "https://pbe-red.lol.sgp.pvp.net"
                             elif str(e) == "'payments'":
                                 dictionary[region] = ""
+                        elif "LOLTMNT" in region or "ESPORTSTMNT" in region: # esports:
+                            if str(e) == "'client_config'":
+                                dictionary[region] = "https://clientconfig.esports.rpg.riotgames.com"
                         else:
                             print(f"KeyError read: {e} not found for region {region}")
 
@@ -92,8 +108,8 @@ class SystemYaml:
 
     @staticmethod
     def edit():
-        SystemYaml._edit(SystemYaml.path)
-        SystemYaml._edit(SystemYaml.path_pbe)
+        for path in SystemYaml.paths:
+            SystemYaml._edit(path)
 
     @staticmethod
     def _edit(path: str):
@@ -125,6 +141,9 @@ class SystemYaml:
                 if url not in ProxyServers.started_proxies:
                     port = find_free_port()
                     start_http_proxy(url, port)
+
+                    if "https://auth." in url:
+                        ProxyServers.auth_port = port
                 new_text += text[last_end:match.start()]
                 new_text += f"http://localhost:{ProxyServers.started_proxies[url]}"
                 last_end = match.end()
@@ -161,7 +180,7 @@ class SystemYaml:
 
             # todo, chat, clientconfig
 
-        new_path = path.replace('system.yaml', 'Config\\system.yaml')
+        new_path = path.replace('system.yaml', 'Config/system.yaml')
         os.makedirs(os.path.dirname(new_path), exist_ok=True)  # make the Config folder if it doesn't exist
         with open(new_path, 'w', encoding='utf-8') as file:
             yaml.YAML(typ='rt').dump(read_data, file)

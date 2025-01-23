@@ -1,4 +1,4 @@
-import os, asyncio, re, requests, datetime
+import os, asyncio, re, requests, datetime, platform
 from UiObjects import *
 
 
@@ -8,6 +8,9 @@ class ValoLogWatcher:
         self.entitlements = entitlements
 
     async def run(self):
+        if platform.system() != "Windows":
+            return
+
         log_path = os.getenv('LOCALAPPDATA') + r"\VALORANT\Saved\Logs\ShooterGame.log"
         if not os.path.exists(log_path):
             print(f"File {log_path} does not exist.")

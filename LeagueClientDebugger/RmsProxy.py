@@ -1,4 +1,4 @@
-import asyncio, websockets, gzip, re, datetime
+import asyncio, websockets, gzip, re, datetime, ssl
 
 from UiObjects import *
 
@@ -57,7 +57,7 @@ class RmsProxy:
                 print("[RMS] Connection closed ", e)
                 UiObjects.add_disconnected_item(UiObjects.rmsList, str(ws.useragent))
 
-        async with websockets.connect(target_hostname + path, extra_headers=req_headers) as target_ws:
+        async with websockets.connect(target_hostname + path, extra_headers=req_headers, ssl=ssl._create_unverified_context()) as target_ws:
             RmsProxy.global_ws = ws
             RmsProxy.global_target_ws = target_ws
             RmsProxy.global_useragent = ws.useragent

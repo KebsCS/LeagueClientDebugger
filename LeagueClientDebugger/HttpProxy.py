@@ -1,4 +1,4 @@
-import asyncio, requests, ssl, gzip, datetime
+import asyncio, requests, ssl, gzip, datetime, re
 from httptools import HttpRequestParser
 from requests.adapters import HTTPAdapter
 from typing import Any
@@ -107,9 +107,12 @@ class HttpProxy:
             return request
 
         def edit_response(self, response: requests.Response) -> requests.Response:
-            if response.url == "https://auth.riotgames.com/.well-known/openid-configuration":
-                response._content = response.text.replace("https://auth.riotgames.com",
-                                                          f"http://localhost:{ProxyServers.started_proxies['https://auth.riotgames.com']}").encode()
+            if response.url.startswith("https://auth.") and response.url.endswith("/.well-known/openid-configuration"):
+                response._content = re.sub(
+                    r"https://auth\.(riotgames|esports\.rpg\.riotgames)\.com",
+                    lambda match: f"http://localhost:{ProxyServers.started_proxies[match.group(0)]}",
+                    response.text
+                ).encode()
 
             # CORS fix
             if response.request.method.upper() == "OPTIONS":
