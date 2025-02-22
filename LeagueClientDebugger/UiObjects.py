@@ -22,6 +22,9 @@ class UiObjects:
     allDisableVanguard = None
     valoCallGets = None
 
+    miscDowngradeLCEnabled = None
+    miscDowngradeLCText = None
+
     # Options
     optionsDarkMode = None
     optionsEnableInject = None
@@ -30,6 +33,7 @@ class UiObjects:
     optionsIncludeJWTs = None
     optionsDisableAuth = None
     optionsRunAsAdmin = None
+    optionsClientHandlesCookies = None
 
     @staticmethod
     def add_connected_item(list_widget: QListWidgetItem, extra_info="", extra_data=" "):

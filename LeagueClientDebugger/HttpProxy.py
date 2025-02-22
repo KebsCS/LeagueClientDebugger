@@ -96,7 +96,7 @@ class HttpProxy:
             self.req.method = self.parser.get_method().decode()
 
         def on_header(self, name, value):
-            if name.decode() == "Cookie":
+            if name.decode() == "Cookie" and not UiObjects.optionsClientHandlesCookies.isChecked():
                 return  # requests session handles cookies
             self.req.headers[name.decode()] = value.decode()
 
@@ -121,16 +121,23 @@ class HttpProxy:
 
                 headers_to_modify = ['Access-Control-Allow-Origin', 'Access-Control-Allow-Methods',
                                      'Access-Control-Allow-Headers', 'Access-Control-Expose-Headers']
-
-                if "publishing.riotgames.com" in response.url:
-                    for headers_dict in [response.headers, response.raw.headers]:
-                        for header in headers_to_modify:
-                            headers_dict[header] = "*"
+                headers_to_modify_lower = [header.lower() for header in headers_to_modify]
 
                 for headers_dict in [response.headers, response.raw.headers]:
                     for header in headers_dict:
-                        if header.lower() in headers_to_modify:
+                        if header.lower() in headers_to_modify_lower:
                             headers_dict[header] = '*'
+
+
+            if UiObjects.miscDowngradeLCEnabled.isChecked():
+                # name change screen bypass from 2020
+                # summoner names got removed from all requests and namechange endpoints don't exist anymore
+                if "summoners/summoner-ids" in response.url or "summoners/puuids" in response.url:
+                    original = response.json()
+                    for player in original:
+                        if "unnamed" in player:
+                            player["unnamed"] = False
+                    response._content = json.dumps(original).encode()
 
             return response
 
@@ -156,9 +163,9 @@ class HttpProxy:
             response = self.edit_response(response)
 
             if "Content-Length" in response.headers:
-                response.headers["Content-Length"] = str(len(response.text))
+                response.headers["Content-Length"] = str(len(response.content))
             if "Content-Length" in response.raw.headers:
-                response.raw.headers["Content-Length"] = str(len(response.text))
+                response.raw.headers["Content-Length"] = str(len(response.content))
             if "Content-Encoding" in response.raw.headers:  # remove gzip
                 encodings = [encoding.strip() for encoding in response.raw.headers["Content-Encoding"].split(",")]
                 encodings = [encoding for encoding in encodings if encoding.lower() != "gzip"]

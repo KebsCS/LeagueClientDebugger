@@ -75,6 +75,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         UiObjects.allDisableVanguard = self.allDisableVanguard
         UiObjects.valoCallGets = self.valoCallGets
 
+        UiObjects.miscDowngradeLCEnabled = self.miscDowngradeLCEnabled
+        UiObjects.miscDowngradeLCText = self.miscDowngradeLCText
+
         self.allButtonDecodeJWTs.setEnabled(False)
 
         self.options_dialog = QtWidgets.QDialog()
@@ -97,6 +100,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         UiObjects.optionsIncludeJWTs = dialog_ui.optionsIncludeJWTs
         UiObjects.optionsDisableAuth = dialog_ui.optionsDisableAuth
         UiObjects.optionsRunAsAdmin = dialog_ui.optionsRunAsAdmin
+        UiObjects.optionsClientHandlesCookies = dialog_ui.optionsClientHandlesCookies
 
         self.icon_xmpp = QIcon(os.path.join(self.base_dir, "images/xmpp.png"))
         self.tabWidget.setTabIcon(1, self.icon_xmpp)
@@ -676,6 +680,15 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                     except Exception:
                         pass
 
+                matches_gzip = re.findall(GZIP_PATTERN, text)
+                for match in matches_gzip:
+                    decoded_text = gzip.decompress(base64.b64decode(match.encode("utf-8"))).decode('utf-8')
+                    try:
+                        decoded_text = json.dumps(json.loads(decoded_text), indent=4)
+                        text += "\r\n" + decoded_text
+                    except Exception:
+                        pass
+
             if search_text in text.lower():
                 item.setBackground(Qt.yellow)
             else:
@@ -840,6 +853,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                 else:
                     patchline = '--launch-patchline=' + ('pbe' if 'PBE' in selected_region else 'live')
                     args_list += [patchline]
+
+            if self.miscDowngradeLCEnabled.isChecked():
+                args_list = [x for x in args_list if x != "--allow-multiple-clients" and x != "--disable-patching"]
 
             print(f"Launched {clientPath} {args_list}")
             league.startDetached(clientPath, args_list)
@@ -1259,8 +1275,17 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                 if "optionsRunAsAdmin" in data:
                     UiObjects.optionsRunAsAdmin.setChecked(data["optionsRunAsAdmin"])
 
+                if "optionsClientHandlesCookies" in data:
+                    UiObjects.optionsClientHandlesCookies.setChecked(data["optionsClientHandlesCookies"])
+
                 if "valoCallGets" in data:
                     self.valoCallGets.setChecked(data["valoCallGets"])
+
+                if "miscDowngradeLCEnabled" in data:
+                    self.miscDowngradeLCEnabled.setChecked(data["miscDowngradeLCEnabled"])
+
+                if "miscDowngradeLCText" in data:
+                    self.miscDowngradeLCText.setPlainText(data["miscDowngradeLCText"])
 
                 if "lcuEnabled" in data:
                     self.lcuEnabled.setChecked(data["lcuEnabled"])
@@ -1371,6 +1396,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             data["optionsIncludeJWTs"] = UiObjects.optionsIncludeJWTs.isChecked()
             data["optionsDisableAuth"] = UiObjects.optionsDisableAuth.isChecked()
             data["optionsRunAsAdmin"] = UiObjects.optionsRunAsAdmin.isChecked()
+            data["optionsClientHandlesCookies"] = UiObjects.optionsClientHandlesCookies.isChecked()
 
             data["allDisableVanguard"] = self.allDisableVanguard.isChecked()
             data["valoCallGets"] = self.valoCallGets.isChecked()
@@ -1380,6 +1406,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             data["allTextRCArgs"] = self.allTextRCArgs.toPlainText()
             data["allTextLCArgs"] = self.allTextLCArgs.toPlainText()
             data["allCheckboxLC"] = self.allCheckboxLC.isChecked()
+
+            data["miscDowngradeLCEnabled"] = self.miscDowngradeLCEnabled.isChecked()
+            data["miscDowngradeLCText"] = self.miscDowngradeLCText.toPlainText()
 
             data["blocklist_enabled"] = self.blocklist_enabled
             data["blocklist_hosts"] = self.miscBlocklist.toPlainText()
@@ -1392,8 +1421,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
 
     def closeEvent(self, event):
         #todo close all proxies
-       self.SaveConfig()
-       event.accept()
+        self.SaveConfig()
+        HttpProxy.session.close()
+        event.accept()
 
 if __name__ == "__main__":
     # print silent QT errors

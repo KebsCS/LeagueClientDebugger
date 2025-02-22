@@ -105,7 +105,7 @@
                 <property name="maximumSize">
                  <size>
                   <width>16777215</width>
-                  <height>20</height>
+                  <height>23</height>
                  </size>
                 </property>
                 <property name="inputMethodHints">
@@ -319,7 +319,7 @@
                 <property name="maximumSize">
                  <size>
                   <width>16777215</width>
-                  <height>20</height>
+                  <height>23</height>
                  </size>
                 </property>
                 <property name="inputMethodHints">
@@ -361,7 +361,7 @@
                 <property name="maximumSize">
                  <size>
                   <width>16777215</width>
-                  <height>20</height>
+                  <height>23</height>
                  </size>
                 </property>
                 <property name="inputMethodHints">
@@ -487,7 +487,7 @@
                 <property name="maximumSize">
                  <size>
                   <width>16777215</width>
-                  <height>20</height>
+                  <height>23</height>
                  </size>
                 </property>
                 <property name="inputMethodHints">
@@ -708,7 +708,7 @@
                 <property name="maximumSize">
                  <size>
                   <width>16777215</width>
-                  <height>20</height>
+                  <height>23</height>
                  </size>
                 </property>
                 <property name="inputMethodHints">
@@ -882,7 +882,7 @@
                 <property name="maximumSize">
                  <size>
                   <width>16777215</width>
-                  <height>20</height>
+                  <height>23</height>
                  </size>
                 </property>
                 <property name="inputMethodHints">
@@ -1039,7 +1039,7 @@
                 <property name="maximumSize">
                  <size>
                   <width>16777215</width>
-                  <height>20</height>
+                  <height>23</height>
                  </size>
                 </property>
                 <property name="inputMethodHints">
@@ -1356,7 +1356,7 @@
                 <property name="maximumSize">
                  <size>
                   <width>16777215</width>
-                  <height>20</height>
+                  <height>23</height>
                  </size>
                 </property>
                 <property name="verticalScrollBarPolicy">
@@ -1544,7 +1544,7 @@
                 <property name="maximumSize">
                  <size>
                   <width>16777215</width>
-                  <height>20</height>
+                  <height>23</height>
                  </size>
                 </property>
                 <property name="inputMethodHints">
@@ -1728,7 +1728,7 @@
                 <property name="maximumSize">
                  <size>
                   <width>16777215</width>
-                  <height>20</height>
+                  <height>23</height>
                  </size>
                 </property>
                 <property name="inputMethodHints">
@@ -2317,6 +2317,211 @@
         <string>Misc</string>
        </attribute>
        <layout class="QGridLayout" name="gridLayout">
+        <item row="5" column="0">
+         <layout class="QVBoxLayout" name="verticalLayout_57">
+          <item>
+           <widget class="QLabel" name="label_14">
+            <property name="text">
+             <string>Date YYYY-MM-DD HH:MM:SS to timestamp</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="horizontalLayout_91">
+            <item>
+             <widget class="QTextEdit" name="miscTextDate">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Expanding" vsizetype="Minimum">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="maximumSize">
+               <size>
+                <width>150</width>
+                <height>23</height>
+               </size>
+              </property>
+              <property name="inputMethodHints">
+               <set>Qt::ImhNone</set>
+              </property>
+              <property name="verticalScrollBarPolicy">
+               <enum>Qt::ScrollBarAlwaysOff</enum>
+              </property>
+              <property name="horizontalScrollBarPolicy">
+               <enum>Qt::ScrollBarAlwaysOff</enum>
+              </property>
+              <property name="lineWrapMode">
+               <enum>QTextEdit::NoWrap</enum>
+              </property>
+              <property name="acceptRichText">
+               <bool>false</bool>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="miscButtonDate">
+              <property name="text">
+               <string>Submit</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <widget class="QLabel" name="label_13">
+            <property name="text">
+             <string>Unix timestamp to human-readable date</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="horizontalLayout_90">
+            <item>
+             <widget class="QTextEdit" name="miscTextTimestamp">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Expanding" vsizetype="Minimum">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="maximumSize">
+               <size>
+                <width>150</width>
+                <height>23</height>
+               </size>
+              </property>
+              <property name="inputMethodHints">
+               <set>Qt::ImhDigitsOnly</set>
+              </property>
+              <property name="verticalScrollBarPolicy">
+               <enum>Qt::ScrollBarAlwaysOff</enum>
+              </property>
+              <property name="horizontalScrollBarPolicy">
+               <enum>Qt::ScrollBarAlwaysOff</enum>
+              </property>
+              <property name="lineWrapMode">
+               <enum>QTextEdit::NoWrap</enum>
+              </property>
+              <property name="html">
+               <string>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
+p, li { white-space: pre-wrap; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;&quot;&gt;
+&lt;p style=&quot;-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; font-family:'Segoe UI'; font-size:9pt;&quot;&gt;&lt;br /&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+              </property>
+              <property name="acceptRichText">
+               <bool>false</bool>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="miscButtonTimestamp">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="maximumSize">
+               <size>
+                <width>999</width>
+                <height>16777215</height>
+               </size>
+              </property>
+              <property name="text">
+               <string>Submit</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </item>
+        <item row="12" column="0">
+         <spacer name="verticalSpacer_2">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>20</width>
+            <height>40</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+        <item row="0" column="3">
+         <spacer name="horizontalSpacer_31">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>40</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+        <item row="6" column="0">
+         <widget class="Line" name="line">
+          <property name="frameShadow">
+           <enum>QFrame::Plain</enum>
+          </property>
+          <property name="lineWidth">
+           <number>5</number>
+          </property>
+          <property name="midLineWidth">
+           <number>5</number>
+          </property>
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="0">
+         <widget class="Line" name="line_2">
+          <property name="frameShadow">
+           <enum>QFrame::Plain</enum>
+          </property>
+          <property name="lineWidth">
+           <number>5</number>
+          </property>
+          <property name="midLineWidth">
+           <number>5</number>
+          </property>
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="2">
+         <spacer name="horizontalSpacer_33">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>60</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+        <item row="0" column="4">
+         <spacer name="horizontalSpacer_32">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>40</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
         <item row="0" column="0">
          <layout class="QVBoxLayout" name="verticalLayout_58">
           <item>
@@ -2369,8 +2574,8 @@
           </item>
          </layout>
         </item>
-        <item row="6" column="0">
-         <widget class="Line" name="line">
+        <item row="11" column="0">
+         <widget class="Line" name="line_3">
           <property name="frameShadow">
            <enum>QFrame::Plain</enum>
           </property>
@@ -2385,191 +2590,66 @@
           </property>
          </widget>
         </item>
-        <item row="0" column="4">
-         <spacer name="horizontalSpacer_32">
-          <property name="orientation">
-           <enum>Qt::Horizontal</enum>
-          </property>
-          <property name="sizeHint" stdset="0">
-           <size>
-            <width>40</width>
-            <height>20</height>
-           </size>
-          </property>
-         </spacer>
-        </item>
-        <item row="1" column="0">
-         <widget class="Line" name="line_2">
-          <property name="frameShadow">
-           <enum>QFrame::Plain</enum>
-          </property>
-          <property name="lineWidth">
-           <number>5</number>
-          </property>
-          <property name="midLineWidth">
-           <number>5</number>
-          </property>
-          <property name="orientation">
-           <enum>Qt::Horizontal</enum>
-          </property>
-         </widget>
-        </item>
-        <item row="0" column="2">
-         <spacer name="horizontalSpacer_33">
-          <property name="orientation">
-           <enum>Qt::Horizontal</enum>
-          </property>
-          <property name="sizeHint" stdset="0">
-           <size>
-            <width>60</width>
-            <height>20</height>
-           </size>
-          </property>
-         </spacer>
-        </item>
-        <item row="5" column="0">
-         <layout class="QVBoxLayout" name="verticalLayout_57">
+        <item row="8" column="0">
+         <layout class="QHBoxLayout" name="horizontalLayout_43">
           <item>
-           <widget class="QLabel" name="label_14">
+           <widget class="QCheckBox" name="miscDowngradeLCEnabled">
+            <property name="toolTip">
+             <string>Requires client restart, rtmp proxy won't work</string>
+            </property>
             <property name="text">
-             <string>Date YYYY-MM-DD HH:MM:SS to timestamp</string>
+             <string>Downgrade League Client</string>
             </property>
            </widget>
           </item>
           <item>
-           <layout class="QHBoxLayout" name="horizontalLayout_91">
-            <item>
-             <widget class="QTextEdit" name="miscTextDate">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Expanding" vsizetype="Minimum">
-                <horstretch>0</horstretch>
-                <verstretch>0</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="maximumSize">
-               <size>
-                <width>150</width>
-                <height>20</height>
-               </size>
-              </property>
-              <property name="inputMethodHints">
-               <set>Qt::ImhNone</set>
-              </property>
-              <property name="verticalScrollBarPolicy">
-               <enum>Qt::ScrollBarAlwaysOff</enum>
-              </property>
-              <property name="horizontalScrollBarPolicy">
-               <enum>Qt::ScrollBarAsNeeded</enum>
-              </property>
-              <property name="lineWrapMode">
-               <enum>QTextEdit::NoWrap</enum>
-              </property>
-              <property name="acceptRichText">
-               <bool>false</bool>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QPushButton" name="miscButtonDate">
-              <property name="text">
-               <string>Submit</string>
-              </property>
-             </widget>
-            </item>
-           </layout>
-          </item>
-          <item>
-           <widget class="QLabel" name="label_13">
-            <property name="text">
-             <string>Unix timestamp to human-readable date</string>
+           <widget class="QTextEdit" name="miscDowngradeLCText">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Expanding" vsizetype="Minimum">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="maximumSize">
+             <size>
+              <width>16777215</width>
+              <height>23</height>
+             </size>
+            </property>
+            <property name="inputMethodHints">
+             <set>Qt::ImhNone</set>
+            </property>
+            <property name="verticalScrollBarPolicy">
+             <enum>Qt::ScrollBarAlwaysOff</enum>
+            </property>
+            <property name="horizontalScrollBarPolicy">
+             <enum>Qt::ScrollBarAlwaysOff</enum>
+            </property>
+            <property name="lineWrapMode">
+             <enum>QTextEdit::NoWrap</enum>
+            </property>
+            <property name="acceptRichText">
+             <bool>false</bool>
+            </property>
+            <property name="placeholderText">
+             <string>Enter manifest link</string>
             </property>
            </widget>
-          </item>
-          <item>
-           <layout class="QHBoxLayout" name="horizontalLayout_90">
-            <item>
-             <widget class="QTextEdit" name="miscTextTimestamp">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Expanding" vsizetype="Minimum">
-                <horstretch>0</horstretch>
-                <verstretch>0</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="maximumSize">
-               <size>
-                <width>150</width>
-                <height>20</height>
-               </size>
-              </property>
-              <property name="inputMethodHints">
-               <set>Qt::ImhDigitsOnly</set>
-              </property>
-              <property name="verticalScrollBarPolicy">
-               <enum>Qt::ScrollBarAlwaysOff</enum>
-              </property>
-              <property name="lineWrapMode">
-               <enum>QTextEdit::NoWrap</enum>
-              </property>
-              <property name="html">
-               <string>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
-p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;&quot;&gt;
-&lt;p style=&quot;-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; font-family:'Segoe UI'; font-size:9pt;&quot;&gt;&lt;br /&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-              </property>
-              <property name="acceptRichText">
-               <bool>false</bool>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QPushButton" name="miscButtonTimestamp">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-                <horstretch>0</horstretch>
-                <verstretch>0</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="maximumSize">
-               <size>
-                <width>999</width>
-                <height>16777215</height>
-               </size>
-              </property>
-              <property name="text">
-               <string>Submit</string>
-              </property>
-             </widget>
-            </item>
-           </layout>
           </item>
          </layout>
         </item>
-        <item row="7" column="0">
-         <spacer name="verticalSpacer_2">
-          <property name="orientation">
-           <enum>Qt::Vertical</enum>
+        <item row="10" column="0">
+         <widget class="QLabel" name="label_7">
+          <property name="text">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;a href=&quot;https://github.com/Morilli/riot-manifests/tree/master/LoL&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;List of 'league-client' manifests&lt;/span&gt;&lt;/a&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
           </property>
-          <property name="sizeHint" stdset="0">
-           <size>
-            <width>20</width>
-            <height>40</height>
-           </size>
+          <property name="openExternalLinks">
+           <bool>true</bool>
           </property>
-         </spacer>
-        </item>
-        <item row="0" column="3">
-         <spacer name="horizontalSpacer_31">
-          <property name="orientation">
-           <enum>Qt::Horizontal</enum>
+          <property name="textInteractionFlags">
+           <set>Qt::TextBrowserInteraction</set>
           </property>
-          <property name="sizeHint" stdset="0">
-           <size>
-            <width>40</width>
-            <height>20</height>
-           </size>
-          </property>
-         </spacer>
+         </widget>
         </item>
        </layout>
       </widget>

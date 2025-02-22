@@ -60,6 +60,11 @@ class ConfigProxy:
 
             original_config = response.json()
             config = json.dumps(self.edit_config(original_config))
+
+            if UiObjects.miscDowngradeLCEnabled.isChecked():
+                config = re.sub(r"(\w+)\.ledge\.leagueoflegends\.com", r"\1-red.lol.sgp.pvp.net", config)
+                config = re.sub(r"prod\.(\w+)\.lol\.riotgames\.com", r"feapp.\1.lol.pvp.net", config)
+
             config = match_host_and_start_proxy(config)
 
             config = re.sub(r"(wss://([a-z]{2,4})\.edge\.rms\.si\.riotgames\.com)",
@@ -139,6 +144,8 @@ class ConfigProxy:
             #     config["lol.game_client_settings.pregame_rpd_config"]["save"] = True
             #     config["lol.game_client_settings.pregame_rpd_config"]["send"] = True
 
+             # adds an option in settings to bring back old patch number 15.1 instead of 25.S1.1
+            replace_value("lol.client_settings.show_legacy_patch_numbers_setting", True)
 
             # revert change, that makes the league client load longer
             replace_value("lol.client_settings.startup.should_wait_for_home_hubs", False)
@@ -193,6 +200,10 @@ class ConfigProxy:
                                 if UiObjects.allCheckboxLC.isChecked():
                                     node["launcher"]["arguments"] = ['--' + arg.strip() for arg in UiObjects.allTextLCArgs.toPlainText().split('--') if arg.strip()]
                                 node["launcher"]["arguments"].append('--system-yaml-override=Config/system.yaml')
+
+                            # downgrade the client, to go below season 12 you have to change domains - ledge and lcds
+                            if "patch_url" in node and UiObjects.miscDowngradeLCEnabled.isChecked():
+                                node["patch_url"] = UiObjects.miscDowngradeLCText.toPlainText()
 
                             if "launchable_on_update_fail" in node:
                                 node["launchable_on_update_fail"] = True

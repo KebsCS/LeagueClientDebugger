@@ -4,6 +4,7 @@ from ProxyServers import ProxyServers, find_free_port
 from HttpProxy import HttpProxy
 from RtmpProxy import RtmpProxy
 from RmsProxy import RmsProxy
+from UiObjects import UiObjects
 
 
 class SystemYaml:
@@ -150,23 +151,30 @@ class SystemYaml:
             new_text += text[last_end:]
             return new_text
 
+        if UiObjects.miscDowngradeLCEnabled.isChecked():
+            content = re.sub(r"(\w+)\.ledge\.leagueoflegends\.com", r"\1-red.lol.sgp.pvp.net", content)
+            content = re.sub(r"prod\.(\w+)\.lol\.riotgames\.com", r"feapp.\1.lol.pvp.net", content)
+
         new_content = match_host_and_start_proxy(content)
 
         read_data = yaml.YAML(typ='rt').load(new_content)
         for region in read_data['region_data']:
             key = read_data['region_data'][region]["servers"]
 
-            lcds_port = find_free_port()
-            rtmp_proxy = RtmpProxy()
-            loop = asyncio.get_event_loop()
-            try:
-                loop.create_task(
-                    rtmp_proxy.start_client_proxy("127.0.0.1", lcds_port, key["lcds"]["lcds_host"], str(key["lcds"]["lcds_port"])))
-                key["lcds"]["lcds_host"] = "127.0.0.1"
-                key["lcds"]["lcds_port"] = lcds_port
-                key["lcds"]["use_tls"] = False
-            except KeyError as e:
-                pass
+            # on old patches some lcdsServiceProxy calls break when receiving the message
+            # probably wrong decoding in my rtmp implementation, not a high priority to fix
+            if not UiObjects.miscDowngradeLCEnabled.isChecked():
+                lcds_port = find_free_port()
+                rtmp_proxy = RtmpProxy()
+                loop = asyncio.get_event_loop()
+                try:
+                    loop.create_task(
+                        rtmp_proxy.start_client_proxy("127.0.0.1", lcds_port, key["lcds"]["lcds_host"], str(key["lcds"]["lcds_port"])))
+                    key["lcds"]["lcds_host"] = "127.0.0.1"
+                    key["lcds"]["lcds_port"] = lcds_port
+                    key["lcds"]["use_tls"] = False
+                except KeyError as e:
+                    pass
 
             # todo, client config needs rms.port, find which host's port to replace
             # try:
