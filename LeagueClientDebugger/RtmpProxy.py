@@ -3,6 +3,7 @@ from UiObjects import *
 from rtmp.ByteStreamReader import ByteStreamReader
 from rtmp.Amf0 import Amf0Decoder, Amf0Encoder, Amf0Amf3
 from rtmp.Amf3 import Amf3Undefined
+from ProxyServers import ProxyServers
 
 
 class CustomJSONEncoder(json.JSONEncoder):
@@ -163,7 +164,6 @@ class RtmpParser:
                 obj["data"] = decoder.decode()
                 #print(json.dumps(obj, indent=4))
 
-                # mitm example - revealing names in champion select
                 def mitm():
                     if type(obj["data"]) is Amf0Amf3:
                         data = obj["data"].value
@@ -182,48 +182,58 @@ class RtmpParser:
                         else:
                             return
 
-                        payload = None
-                        is_compressed = False
-                        if "compressedPayload" in body and body["compressedPayload"] is True:
-                            is_compressed = True
-                            payload = body["payload"]
-                            payload = gzip.decompress(base64.b64decode(payload.encode("utf-8")))
-                        elif "payload" in body and body["payload"]:
-                            payload = body["payload"]
-                        if payload:
-                            payload = json.loads(payload.decode('utf-8') if type(payload) is bytes else payload)
+                        if "ClientDynamicConfigurationNotification" in body.name and "configs" in body and body["configs"]:
+                            configs = gzip.decompress(base64.b64decode(body["configs"].encode("utf-8")))
+                            configs = json.loads(configs.decode('utf-8') if type(configs) is bytes else configs)
+                            if "PlayerPreferences" in configs and configs["PlayerPreferences"]["ServiceEndpoint"] in ProxyServers.started_proxies:
+                                configs["PlayerPreferences"]["ServiceEndpoint"] = f"http://localhost:{ProxyServers.started_proxies[configs["PlayerPreferences"]["ServiceEndpoint"]]}"
+                                configs["PlayerPreferences"]["Enabled"] = False
+                            if "LcuOverridePlayerPreferences" in configs and configs["LcuOverridePlayerPreferences"]["ServiceEndpoint"] in ProxyServers.started_proxies:
+                                configs["LcuOverridePlayerPreferences"]["ServiceEndpoint"] = f"http://localhost:{ProxyServers.started_proxies[configs["LcuOverridePlayerPreferences"]["ServiceEndpoint"]]}"
+                                configs["LcuOverridePlayerPreferences"]["EnforceHttps"] = False
 
-                            # reveal
-                            if "queueId" in payload and payload["queueId"] == 420:  # soloq
-                                if "championSelectState" in payload:
-                                    for cell in payload["championSelectState"]["cells"]["alliedTeam"]:
-                                        if "nameVisibilityType" in cell and cell["nameVisibilityType"] != "UNHIDDEN":
-                                            cell["nameVisibilityType"] = "UNHIDDEN"
-                            if is_compressed:
-                                payload = base64.b64encode(gzip.compress(json.dumps(payload).encode('utf-8'))).decode('utf-8')
-                            body["payload"] = payload
+                            body["configs"] = base64.b64encode(gzip.compress(json.dumps(configs).encode('utf-8'))).decode('utf-8')
 
-                # mitm()
+                        # mitm example - revealing names in champion select
+                        # payload = None
+                        # is_compressed = False
+                        # if "compressedPayload" in body and body["compressedPayload"] is True:
+                        #     is_compressed = True
+                        #     payload = body["payload"]
+                        #     payload = gzip.decompress(base64.b64decode(payload.encode("utf-8")))
+                        # elif "payload" in body and body["payload"]:
+                        #     payload = body["payload"]
+                        # if payload:
+                        #     payload = json.loads(payload.decode('utf-8') if type(payload) is bytes else payload)
+                        #
+                        #     # reveal
+                        #     if "queueId" in payload and payload["queueId"] == 420:  # soloq
+                        #         if "championSelectState" in payload:
+                        #             for cell in payload["championSelectState"]["cells"]["alliedTeam"]:
+                        #                 if "nameVisibilityType" in cell and cell["nameVisibilityType"] != "UNHIDDEN":
+                        #                     cell["nameVisibilityType"] = "UNHIDDEN"
+                        #     if is_compressed:
+                        #         payload = base64.b64encode(gzip.compress(json.dumps(payload).encode('utf-8'))).decode('utf-8')
+                        #     body["payload"] = payload
 
-                # Uncomment if you make any changes to the packets
-                # Encoding slows down the client a bit, and it's not necessary
+                if not UiObjects.optionsDisableRTMPEncoding.isChecked():
+                    try:
+                        mitm()
+                        encoder = Amf0Encoder()
+                        if "version" in obj:
+                            encoder.stream.write_uchar(obj["version"])
+                        encoder.encode(obj["result"])
+                        encoder.encode(obj["invokeId"])
+                        encoder.encode(obj["serviceCall"])
+                        encoder.encode(obj["data"])
+                        new_packet = RtmpPacket(copy.deepcopy(packet.header), packet.buffer[:], 0)
+                        new_packet.buffer = encoder.stream.data
+                        new_packet.header.message_length = len(new_packet.buffer)
 
-                # try:
-                #     encoder = Amf0Encoder()
-                #     if "version" in obj:
-                #         encoder.stream.write_uchar(obj["version"])
-                #     encoder.encode(obj["result"])
-                #     encoder.encode(obj["invokeId"])
-                #     encoder.encode(obj["serviceCall"])
-                #     encoder.encode(obj["data"])
-                #     new_packet = RtmpPacket(copy.deepcopy(packet.header), packet.buffer[:], 0)
-                #     new_packet.buffer = encoder.stream.data
-                #     new_packet.header.message_length = len(new_packet.buffer)
-                #
-                #     packet = new_packet
-                # except Exception as e:
-                #     print(f"Amf encode error: {e}")
-                #     print(f"Handled packet: {packet.buffer}")
+                        packet = new_packet
+                    except Exception as e:
+                        print(f"Amf encode error: {e}")
+                        print(f"Handled packet: {packet.buffer}")
 
 
             elif packet.header.message_type_id == 0x01:     # Set Chunk Size

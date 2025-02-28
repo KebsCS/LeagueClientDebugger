@@ -34,6 +34,7 @@ class UiObjects:
     optionsDisableAuth = None
     optionsRunAsAdmin = None
     optionsClientHandlesCookies = None
+    optionsDisableRTMPEncoding = None
 
     @staticmethod
     def add_connected_item(list_widget: QListWidgetItem, extra_info="", extra_data=" "):

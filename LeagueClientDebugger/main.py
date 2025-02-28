@@ -1,7 +1,7 @@
 from DetachableTabWidget import DetachableTabWidget
 from PyQt5 import QtWidgets
 QtWidgets.QTabWidget = DetachableTabWidget
-import sys, json, time, os, io, asyncio, pymem, requests, gzip, re, base64, datetime, psutil, ctypes, shutil, platform
+import sys, json, time, os, io, asyncio, pymem, requests, gzip, re, base64, datetime, psutil, ctypes, shutil, platform, zlib
 from lxml import etree
 from PyQt5.uic import loadUiType # PyCharm bug, import works fine
 from PyQt5.QtCore import pyqtSlot, pyqtSignal, Qt, QEvent, QByteArray, QSize
@@ -101,6 +101,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         UiObjects.optionsDisableAuth = dialog_ui.optionsDisableAuth
         UiObjects.optionsRunAsAdmin = dialog_ui.optionsRunAsAdmin
         UiObjects.optionsClientHandlesCookies = dialog_ui.optionsClientHandlesCookies
+        UiObjects.optionsDisableRTMPEncoding = dialog_ui.optionsDisableRTMPEncoding
 
         self.icon_xmpp = QIcon(os.path.join(self.base_dir, "images/xmpp.png"))
         self.tabWidget.setTabIcon(1, self.icon_xmpp)
@@ -545,7 +546,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
 
         matches_jwt = re.findall(JWT_PATTERN, text)
         matches_gzip = re.findall(GZIP_PATTERN, text)
-        if matches_jwt or matches_gzip:
+        if matches_jwt or matches_gzip or ("https://player-preferences" in text and '"data":' in text):
             self.allButtonDecodeJWTs.setEnabled(True)
         else:
             self.allButtonDecodeJWTs.setEnabled(False)
@@ -579,6 +580,21 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                 except Exception:
                     pass
                 text = text.replace(match, decoded_text)
+
+            # player-preferences data is yaml compressed with zlib and b64 encoded
+            if "https://player-preferences" in text.split("\r")[0]:
+                data_pattern = r'"data": "([A-Za-z0-9+/]+={0,2})"'
+                matches_data = re.findall(data_pattern, text)
+                for match in matches_data:
+                    try:
+                        compressed_bytes = base64.b64decode(match)
+                        decompressed_bytes = zlib.decompress(compressed_bytes, -zlib.MAX_WBITS)
+                        yaml_string = decompressed_bytes.decode('utf-8')
+                        #decoded_data = yaml.safe_load(yaml_string)
+                        text = text.replace(match, yaml_string)
+                    except Exception:
+                        pass
+
             self.allView.setText(text)
             self.allView.verticalScrollBar().setValue(scroll_value)
             self.allButtonDecodeJWTs.setText("Original text")
@@ -668,6 +684,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             if isinstance(text, dict):
                 text = json.dumps(text)
 
+            # todo, merge decoding functions with decode button
             if UiObjects.optionsIncludeJWTs.isChecked():
                 matches = re.findall(JWT_PATTERN, text)
                 for match in matches:
@@ -688,6 +705,20 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                         text += "\r\n" + decoded_text
                     except Exception:
                         pass
+
+                # player-preferences data is yaml compressed with zlib and b64 encoded
+                if text and "https://player-preferences" in text.split("\r")[0]:
+                    data_pattern = r'"data": "([A-Za-z0-9+/]+={0,2})"'
+                    matches_data = re.findall(data_pattern, text)
+                    for match in matches_data:
+                        try:
+                            compressed_bytes = base64.b64decode(match)
+                            decompressed_bytes = zlib.decompress(compressed_bytes, -zlib.MAX_WBITS)
+                            yaml_string = decompressed_bytes.decode('utf-8')
+                            # decoded_data = yaml.safe_load(yaml_string)
+                            text += "\r\n" + yaml_string
+                        except Exception:
+                            pass
 
             if search_text in text.lower():
                 item.setBackground(Qt.yellow)
@@ -1278,6 +1309,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                 if "optionsClientHandlesCookies" in data:
                     UiObjects.optionsClientHandlesCookies.setChecked(data["optionsClientHandlesCookies"])
 
+                if "optionsDisableRTMPEncoding" in data:
+                    UiObjects.optionsDisableRTMPEncoding.setChecked(data["optionsDisableRTMPEncoding"])
+
                 if "valoCallGets" in data:
                     self.valoCallGets.setChecked(data["valoCallGets"])
 
@@ -1397,6 +1431,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             data["optionsDisableAuth"] = UiObjects.optionsDisableAuth.isChecked()
             data["optionsRunAsAdmin"] = UiObjects.optionsRunAsAdmin.isChecked()
             data["optionsClientHandlesCookies"] = UiObjects.optionsClientHandlesCookies.isChecked()
+            data["optionsDisableRTMPEncoding"] = UiObjects.optionsDisableRTMPEncoding.isChecked()
 
             data["allDisableVanguard"] = self.allDisableVanguard.isChecked()
             data["valoCallGets"] = self.valoCallGets.isChecked()

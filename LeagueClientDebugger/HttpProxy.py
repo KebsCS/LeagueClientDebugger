@@ -59,6 +59,7 @@ class SSLAdapter(HTTPAdapter):
 
 class HttpProxy:
     is_valo_log_running = False
+    userinfo_token = "" # not consistently updated, only used for rtmp player-preferences
 
     session = requests.sessions.Session()
     session.mount('https://', SSLAdapter())
@@ -104,6 +105,11 @@ class HttpProxy:
             self.req.body += body
 
         def edit_request(self, request: Request) -> Request:
+
+            # after replacing player-preferences in rtmp, sent player-preference requests from client don't have authorization header
+            if "https://player-preferences" in request.url and "Authorization" not in request.headers and HttpProxy.userinfo_token:
+                request.headers["Authorization"] = HttpProxy.userinfo_token
+
             return request
 
         def edit_response(self, response: requests.Response) -> requests.Response:
@@ -159,6 +165,11 @@ class HttpProxy:
                 entitlements = response.json()["entitlements_token"]
                 valo_log = ValoLogWatcher(auth, entitlements)
                 asyncio.create_task(valo_log.run())
+
+            # valid for 1h, best to get a new one when it's refreshed, although this isn't too important as
+            # I think player-preferences are sent only at beginning after login and client doesn't rely on them
+            if "https://player-preferences" in self.req.url and "Authorization" in self.req.headers:
+                HttpProxy.userinfo_token = self.req.headers["Authorization"]
 
             response = self.edit_response(response)
 
