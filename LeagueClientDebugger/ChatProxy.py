@@ -10,7 +10,7 @@ class ProtocolFromServer(asyncio.Protocol):
         self.league_client = league_client
         self.first_req = first_req
 
-        self.all_data = b''
+        self.buffer = b''
 
     def connection_made(self, transport):
         self.real_server = transport
@@ -21,14 +21,44 @@ class ProtocolFromServer(asyncio.Protocol):
         self.real_server.write(self.first_req)
 
     def data_received(self, data):
-        self.all_data += data
-        if self.all_data and self.all_data != b" " and self.all_data[-1] != ord('>'):
-            return
-        message = self.all_data.decode("UTF-8")
-        self.all_data = b''
+        self.buffer += data
+        
+        # Process complete messages
+        while self.is_complete_message(self.buffer):
+            message, self.buffer = self.extract_message(self.buffer)
+            if message:
+                try:
+                    decoded_message = message.decode("UTF-8")
+                    edited_message = ChatProxy.log_and_edit_message(decoded_message, False)
+                    self.league_client.write(edited_message.encode("UTF-8"))
+                except UnicodeDecodeError as e:
+                    print(f"[XMPP] Error decoding message: {e}")
+                    # Forward the raw message if decoding fails
+                    self.league_client.write(message)
 
-        message = ChatProxy.log_and_edit_message(message, False)
-        self.league_client.write(message.encode("UTF-8"))
+    def is_complete_message(self, data):
+        """Check if the buffer contains a complete XMPP message."""
+        if not data:
+            return False
+        
+        # Simple heartbeat
+        if data == b" ":
+            return True
+            
+        # Check if the message ends with '>'
+        return data and data[-1] == ord('>')
+    
+    def extract_message(self, data):
+        """Extract a complete message from the buffer."""
+        if data == b" ":
+            return data, b''
+            
+        # For XML messages, we need to ensure we have a complete message
+        # This is a simplified approach - a real XML parser would be more robust
+        if data and data[-1] == ord('>'):
+            return data, b''
+        
+        return None, data
 
     def connection_lost(self, exc):
         print('[XMPP] Connection lost with riot server', exc)
@@ -55,7 +85,7 @@ class ChatProxy:
             self.real_server = None
             self.league_client = None
 
-            self.all_data = b''
+            self.buffer = b''
 
         def connection_made(self, transport):
             self.league_client = transport
@@ -73,36 +103,80 @@ class ChatProxy:
                 self.is_connected = False
 
         def data_received(self, data):
-            self.all_data += data
-            if self.all_data and self.all_data != b" " and self.all_data[-1] != ord('>'):
-                return
-            message = self.all_data.decode("UTF-8")
-            self.all_data = b''
+            self.buffer += data
+            
+            # Process complete messages
+            while self.is_complete_message(self.buffer):
+                message, self.buffer = self.extract_message(self.buffer)
+                if message:
+                    try:
+                        decoded_message = message.decode("UTF-8")
+                        edited_message = ChatProxy.log_and_edit_message(decoded_message, True)
 
-            message = ChatProxy.log_and_edit_message(message, True)
+                        if self.is_connected:
+                            self.real_server.write(edited_message.encode("UTF-8"))
+                        else:
+                            asyncio.ensure_future(
+                                self.connect_to_real_server(self.real_host, self.real_port, self.league_client, edited_message.encode("UTF-8")))
+                    except UnicodeDecodeError as e:
+                        print(f"[XMPP] Error decoding message: {e}")
+                        # Forward the raw message if decoding fails
+                        if self.is_connected:
+                            self.real_server.write(message)
+                        else:
+                            asyncio.ensure_future(
+                                self.connect_to_real_server(self.real_host, self.real_port, self.league_client, message))
 
-            if self.is_connected:
-                self.real_server.write(message.encode("UTF-8"))
-            else:
-                asyncio.ensure_future(
-                    self.connect_to_real_server(self.real_host, self.real_port, self.league_client, message.encode("UTF-8")))
+        def is_complete_message(self, data):
+            """Check if the buffer contains a complete XMPP message."""
+            if not data:
+                return False
+            
+            # Simple heartbeat
+            if data == b" ":
+                return True
+                
+            # Check if the message ends with '>'
+            return data and data[-1] == ord('>')
+        
+        def extract_message(self, data):
+            """Extract a complete message from the buffer."""
+            if data == b" ":
+                return data, b''
+                
+            # For XML messages, we need to ensure we have a complete message
+            # This is a simplified approach - a real XML parser would be more robust
+            if data and data[-1] == ord('>'):
+                return data, b''
+            
+            return None, data
 
         async def connect_to_real_server(self, real_host, real_port, league_client, first_req):
-            loop = asyncio.get_event_loop()
-            on_con_lost = loop.create_future()
-
-            transport, protocol = await loop.create_connection(
-                lambda: ProtocolFromServer(on_con_lost, league_client, first_req),
-                real_host, real_port, ssl=ssl.SSLContext(protocol=ssl.PROTOCOL_TLSv1_2))
-
-            self.real_server = transport
-            ChatProxy.global_real_server = self.real_server
-            self.is_connected = True
-
             try:
-                await on_con_lost
-            finally:
-                self.real_server.close()
+                loop = asyncio.get_event_loop()
+                on_con_lost = loop.create_future()
+
+                ssl_context = ssl.SSLContext(protocol=ssl.PROTOCOL_TLSv1_2)
+                ssl_context.check_hostname = False
+                ssl_context.verify_mode = ssl.CERT_NONE
+
+                transport, protocol = await loop.create_connection(
+                    lambda: ProtocolFromServer(on_con_lost, league_client, first_req),
+                    real_host, real_port, ssl=ssl_context)
+
+                self.real_server = transport
+                ChatProxy.global_real_server = self.real_server
+                self.is_connected = True
+
+                try:
+                    await on_con_lost
+                finally:
+                    self.real_server.close()
+            except Exception as e:
+                print(f"[XMPP] Error connecting to real server: {e}")
+                # Notify the client about connection failure
+                UiObjects.add_disconnected_item(UiObjects.xmppList)
+                league_client.close()
 
     @staticmethod
     def log_and_edit_message(message, is_outgoing) -> str:
@@ -112,16 +186,17 @@ class ChatProxy:
 
         # MITM
         mitmTableWidget = UiObjects.mitmTableWidget
-        for row in range(mitmTableWidget.rowCount()):
-            if mitmTableWidget.item(row, 2).checkState() != 2:
-                continue
-            resp_req = "Request" if is_outgoing else "Response"
-            if mitmTableWidget.cellWidget(row, 0).currentText() == resp_req:
-                if mitmTableWidget.cellWidget(row, 1).currentText() == "XMPP":
-                    contains = mitmTableWidget.item(row, 2).text()
-                    if contains in message and contains and contains != "":
-                        message = mitmTableWidget.item(row, 3).text()
-                        item.setForeground(Qt.magenta)
+        if mitmTableWidget:
+            for row in range(mitmTableWidget.rowCount()):
+                if mitmTableWidget.item(row, 2).checkState() != 2:
+                    continue
+                resp_req = "Request" if is_outgoing else "Response"
+                if mitmTableWidget.cellWidget(row, 0).currentText() == resp_req:
+                    if mitmTableWidget.cellWidget(row, 1).currentText() == "XMPP":
+                        contains = mitmTableWidget.item(row, 2).text()
+                        if contains in message and contains and contains != "":
+                            message = mitmTableWidget.item(row, 3).text()
+                            item.setForeground(Qt.magenta)
 
         current_time = datetime.datetime.now().strftime("%H:%M:%S")
         text = f"[{current_time}] "
@@ -151,13 +226,16 @@ class ChatProxy:
         return message
 
     async def start_client_proxy(self, proxy_host, proxy_port, real_host, real_port):
-        loop = asyncio.get_running_loop()
+        try:
+            loop = asyncio.get_running_loop()
 
-        server = await loop.create_server(
-            lambda: self.ProtocolFromClient(real_host, real_port),
-            proxy_host, proxy_port)
+            server = await loop.create_server(
+                lambda: self.ProtocolFromClient(real_host, real_port),
+                proxy_host, proxy_port)
 
-        print(f'[XMPP] Proxy server started on {proxy_host}:{proxy_port}')
+            print(f'[XMPP] Proxy server started on {proxy_host}:{proxy_port}')
 
-        async with server:
-            await server.serve_forever()
+            async with server:
+                await server.serve_forever()
+        except Exception as e:
+            print(f"[XMPP] Error starting proxy server: {e}")
