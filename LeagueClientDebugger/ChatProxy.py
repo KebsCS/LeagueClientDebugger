@@ -23,42 +23,17 @@ class ProtocolFromServer(asyncio.Protocol):
     def data_received(self, data):
         self.buffer += data
         
-        # Process complete messages
-        while self.is_complete_message(self.buffer):
-            message, self.buffer = self.extract_message(self.buffer)
-            if message:
-                try:
-                    decoded_message = message.decode("UTF-8")
-                    edited_message = ChatProxy.log_and_edit_message(decoded_message, False)
-                    self.league_client.write(edited_message.encode("UTF-8"))
-                except UnicodeDecodeError as e:
-                    print(f"[XMPP] Error decoding message: {e}")
-                    # Forward the raw message if decoding fails
-                    self.league_client.write(message)
-
-    def is_complete_message(self, data):
-        """Check if the buffer contains a complete XMPP message."""
-        if not data:
-            return False
-        
-        # Simple heartbeat
-        if data == b" ":
-            return True
-            
-        # Check if the message ends with '>'
-        return data and data[-1] == ord('>')
-    
-    def extract_message(self, data):
-        """Extract a complete message from the buffer."""
-        if data == b" ":
-            return data, b''
-            
-        # For XML messages, we need to ensure we have a complete message
-        # This is a simplified approach - a real XML parser would be more robust
-        if data and data[-1] == ord('>'):
-            return data, b''
-        
-        return None, data
+        # Process message if complete
+        message, self.buffer = ChatProxy.extract_message(self.buffer)
+        if message:
+            try:
+                decoded_message = message.decode("UTF-8")
+                edited_message = ChatProxy.log_and_edit_message(decoded_message, False)
+                self.league_client.write(edited_message.encode("UTF-8"))
+            except Exception as e:
+                print(f"[XMPP] Error processing message: {e}")
+                # Forward the raw message if processing fails
+                self.league_client.write(message)
 
     def connection_lost(self, exc):
         print('[XMPP] Connection lost with riot server', exc)
@@ -72,6 +47,23 @@ class ProtocolFromServer(asyncio.Protocol):
 class ChatProxy:
     global_league_client = None
     global_real_server = None
+
+    @staticmethod
+    def extract_message(data):
+        """Extract a complete message from the buffer if available."""
+        if not data:
+            return None, data
+            
+        # Simple heartbeat
+        if data == b" ":
+            return data, b''
+            
+        # For XML messages, check if we have a complete message
+        # This is a simplified approach - a real XML parser would be more robust
+        if data[-1] == ord('>'):
+            return data, b''
+        
+        return None, data
 
     # Incoming from client
     class ProtocolFromClient(asyncio.Protocol):
@@ -105,51 +97,26 @@ class ChatProxy:
         def data_received(self, data):
             self.buffer += data
             
-            # Process complete messages
-            while self.is_complete_message(self.buffer):
-                message, self.buffer = self.extract_message(self.buffer)
-                if message:
-                    try:
-                        decoded_message = message.decode("UTF-8")
-                        edited_message = ChatProxy.log_and_edit_message(decoded_message, True)
+            # Process message if complete
+            message, self.buffer = ChatProxy.extract_message(self.buffer)
+            if message:
+                try:
+                    decoded_message = message.decode("UTF-8")
+                    edited_message = ChatProxy.log_and_edit_message(decoded_message, True)
 
-                        if self.is_connected:
-                            self.real_server.write(edited_message.encode("UTF-8"))
-                        else:
-                            asyncio.ensure_future(
-                                self.connect_to_real_server(self.real_host, self.real_port, self.league_client, edited_message.encode("UTF-8")))
-                    except UnicodeDecodeError as e:
-                        print(f"[XMPP] Error decoding message: {e}")
-                        # Forward the raw message if decoding fails
-                        if self.is_connected:
-                            self.real_server.write(message)
-                        else:
-                            asyncio.ensure_future(
-                                self.connect_to_real_server(self.real_host, self.real_port, self.league_client, message))
-
-        def is_complete_message(self, data):
-            """Check if the buffer contains a complete XMPP message."""
-            if not data:
-                return False
-            
-            # Simple heartbeat
-            if data == b" ":
-                return True
-                
-            # Check if the message ends with '>'
-            return data and data[-1] == ord('>')
-        
-        def extract_message(self, data):
-            """Extract a complete message from the buffer."""
-            if data == b" ":
-                return data, b''
-                
-            # For XML messages, we need to ensure we have a complete message
-            # This is a simplified approach - a real XML parser would be more robust
-            if data and data[-1] == ord('>'):
-                return data, b''
-            
-            return None, data
+                    if self.is_connected:
+                        self.real_server.write(edited_message.encode("UTF-8"))
+                    else:
+                        asyncio.ensure_future(
+                            self.connect_to_real_server(self.real_host, self.real_port, self.league_client, edited_message.encode("UTF-8")))
+                except Exception as e:
+                    print(f"[XMPP] Error processing message: {e}")
+                    # Forward the raw message if processing fails
+                    if self.is_connected:
+                        self.real_server.write(message)
+                    else:
+                        asyncio.ensure_future(
+                            self.connect_to_real_server(self.real_host, self.real_port, self.league_client, message))
 
         async def connect_to_real_server(self, real_host, real_port, league_client, first_req):
             try:
