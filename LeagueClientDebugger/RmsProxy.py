@@ -28,10 +28,12 @@ class RmsProxy:
         if 'origin' in req_headers:
             del req_headers['origin']
 
+        ws.useragent = ""
         try:
             ws.useragent = re.search(r"(?<=\) ).+/.", req_headers["user-agent"]).group()
         except:
-            print("[RMS] useragent error: ", req_headers)
+            pass
+            #print("[RMS] useragent error: ", req_headers)
         UiObjects.add_connected_item(UiObjects.rmsList, str(ws.useragent), json.dumps(req_headers, indent=4))
 
         ws.target_ws_buffer = []

@@ -186,10 +186,10 @@ class RtmpParser:
                             configs = gzip.decompress(base64.b64decode(body["configs"].encode("utf-8")))
                             configs = json.loads(configs.decode('utf-8') if type(configs) is bytes else configs)
                             if "PlayerPreferences" in configs and configs["PlayerPreferences"]["ServiceEndpoint"] in ProxyServers.started_proxies:
-                                configs["PlayerPreferences"]["ServiceEndpoint"] = f"http://localhost:{ProxyServers.started_proxies[configs["PlayerPreferences"]["ServiceEndpoint"]]}"
+                                configs["PlayerPreferences"]["ServiceEndpoint"] = f"http://localhost:{ProxyServers.started_proxies[configs['PlayerPreferences']['ServiceEndpoint']]}"
                                 configs["PlayerPreferences"]["Enabled"] = False
                             if "LcuOverridePlayerPreferences" in configs and configs["LcuOverridePlayerPreferences"]["ServiceEndpoint"] in ProxyServers.started_proxies:
-                                configs["LcuOverridePlayerPreferences"]["ServiceEndpoint"] = f"http://localhost:{ProxyServers.started_proxies[configs["LcuOverridePlayerPreferences"]["ServiceEndpoint"]]}"
+                                configs["LcuOverridePlayerPreferences"]["ServiceEndpoint"] = f"http://localhost:{ProxyServers.started_proxies[configs['LcuOverridePlayerPreferences']['ServiceEndpoint']]}"
                                 configs["LcuOverridePlayerPreferences"]["EnforceHttps"] = False
 
                             body["configs"] = base64.b64encode(gzip.compress(json.dumps(configs).encode('utf-8'))).decode('utf-8')
