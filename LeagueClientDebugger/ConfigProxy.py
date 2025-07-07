@@ -208,12 +208,109 @@ class ConfigProxy:
                             if "launchable_on_update_fail" in node:
                                 node["launchable_on_update_fail"] = True
 
+            found_patchline = False
             for key in config.keys():
                 if ".use_ledge" in key:
                     config[key] = True
 
                 if "keystone.products.league_of_legends.patchlines." in key:
                     override_system_yaml(key)
+
+                if re.search(r"keystone\.products\.\w+\.patchlines\.", key):
+                    found_patchline = True
+
+            if found_patchline:
+                config["keystone.products.lion.full_name"] = "2XKO"
+                config["keystone.products.lion.patchlines.live"] = {
+                "locale_data": {
+                    "available_locales": ["en_US", "ja_JP"],
+                    "default_locale": "en_US"
+                },
+                "metadata": {
+                    "default": {
+                        "alias": {
+                            "platforms": None,
+                            "product_id": ""
+                        },
+                        "available_platforms": ["win", "playstation5", "xboxSeriesXS"],
+                        "client_product_type": "riot_game",
+                        "content_paths": {
+                            "loc": "https://lion.secure.dyn.riotcdn.net/channels/public/rccontent/loc",
+                            "riotstatus": "https://lion.secure.dyn.riotcdn.net/channels/public",
+                            "social": "https://lion.secure.dyn.riotcdn.net/channels/public/rccontent/social"
+                        },
+                        "full_name": "2XKO",
+                        "patch_notes": "https://lion.scd.riotcdn.net/keystone-patchnotes/stable/patch-notes.json",
+                        "path_name": "2XKO/Live",
+                        "rso_client_id": "lion-client",
+                        "theme_manifest": "https://lion.secure.dyn.riotcdn.net/channels/public/rccontent/theme/manifest.json"
+                    },
+                    "installer": {
+                        "alias": {
+                            "platforms": None,
+                            "product_id": ""
+                        }
+                    },
+                    "jpn": {
+                        "alias": {
+                            "platforms": None,
+                            "product_id": ""
+                        },
+                        "default_theme_manifest": "https://lion.secure.dyn.riotcdn.net/channels/public/rccontent/theme/localized_manifest/ja_JP/manifest_jp.json",
+                        "full_name": "2XKO",
+                        "theme_manifest": "https://lion.secure.dyn.riotcdn.net/channels/public/rccontent/theme/localized_manifest/ja_JP/manifest_jp.json"
+                    }
+                },
+                "platforms": {
+                    "win": {
+                        "auto_patch": False,
+                        "configurations": [{
+                            "allowed_http_fallback_hostnames": None,
+                            "bundles_url": "",
+                            "dependencies": [{
+                                "args": ["/silent"],
+                                "elevate": True,
+                                "hash": "",
+                                "id": "DirectX",
+                                "min_version": "1.0.0",
+                                "url": "https://valorant.secure.dyn.riotcdn.net/x/riotclient/dependencies/DirectX_20190310.exe",
+                                "version": "1.0.0"
+                            }],
+                            "entitlements": None,
+                            "excluded_paths": None,
+                            "id": "default",
+                            "launchable_on_update_fail": False,
+                            "metadata": {
+                                "alias": {
+                                    "platforms": None,
+                                    "product_id": ""
+                                }
+                            },
+                            "patch_notes_url": "",
+                            "patch_url": "https://lion.secure.dyn.riotcdn.net/channels/public/releases/0B8FCE6E4B5C7A8B.manifest",
+                            "secondary_patchlines": None,
+                            "seed_url": "",
+                            "tags": [],
+                            "valid_shards": {
+                                "live": ["am", "sea", "nea", "eu"]
+                            }
+                        }],
+                        "dependencies": None,
+                        "deprecated_cloudfront_id": "",
+                        "icon_path": "https://lion.secure.dyn.riotcdn.net/channels/public/rccontent/theme/2XKO.ico",
+                        "install_dir": "2XKO/Live",
+                        "launcher": {
+                            "arguments": [f"--client-config-url=http://127.0.0.1:{ProxyServers.client_config_port}", "--client-id=lion-client", "--riotgamesapi-settings={settings-token}", "-remoting-app-port={remoting-app-port}", "-remoting-auth-token={remoting-auth-token}"],
+                            "component_id": "",
+                            "executables": {
+                                "app": "Lion.exe",
+                                "exe": "Lion.exe"
+                            }
+                        }
+                    }
+                },
+                "version": ""
+            }
 
             if "keystone.player-affinity.playerAffinityServiceURL" in config:
                 if ConfigProxy.geo_pas_url == "":
