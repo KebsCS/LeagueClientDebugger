@@ -2,7 +2,7 @@
 
 ## Features
 * See all requests the Riot Client and Riot's games send and receive - HTTP/S, RMS (riot messaging service), XMPP (chat), RTMP (custom games) and websockets
-* Works on League of Legends, Valorant, Teamfight Tactics and Legends of Runeterra
+* Works on League of Legends, Valorant, 2XKO, Teamfight Tactics and Legends of Runeterra
 * Modify the requests to change how the client works, eg. disable vanguard
 * LCU and Riot Client websocket connection
 * Send custom requests directly to the server or straight to client

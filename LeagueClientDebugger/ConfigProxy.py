@@ -159,6 +159,9 @@ class ConfigProxy:
                 replace_value("anticheat.vanguard.enabled", False)
                 replace_value("anticheat.vanguard.backgroundInstall", False)
                 replace_value("anticheat.vanguard.enforceExactVersionMatching", False)
+                replace_value("lion.vanguard.netrequired", False)
+                replace_value("lion.vanguard.required", False)
+                replace_value("keystone.client.feature_flags.vanguardLaunch.disabled", True)
 
                 def remove_vg_dependency(patchline: str):
                     if platform.system() == "Windows":
@@ -181,6 +184,8 @@ class ConfigProxy:
                 remove_vg_dependency("keystone.products.valorant.patchlines.live")
                 for key in config.keys():
                     if "keystone.products.league_of_legends.patchlines." in key:
+                        remove_vg_dependency(key)
+                    if "keystone.products.lion.patchlines." in key:
                         remove_vg_dependency(key)
 
             replace_value("rms.allow_bad_cert.enabled", True)
@@ -208,7 +213,7 @@ class ConfigProxy:
                             if "launchable_on_update_fail" in node:
                                 node["launchable_on_update_fail"] = True
 
-            found_patchline = False
+            missing_lion_patchline = False
             for key in config.keys():
                 if ".use_ledge" in key:
                     config[key] = True
@@ -216,10 +221,85 @@ class ConfigProxy:
                 if "keystone.products.league_of_legends.patchlines." in key:
                     override_system_yaml(key)
 
-                if re.search(r"keystone\.products\.\w+\.patchlines\.", key):
-                    found_patchline = True
+                if re.search(r"keystone\.products\.(?!lion\.)\w+\.patchlines\.", key):
+                    missing_lion_patchline = True
 
-            if found_patchline:
+            if missing_lion_patchline:
+                config["lion.achievements.enabled"] = True
+                config["lion.analytics.collector_endpoint"] = "data.riotgames.com"
+                config["lion.analytics.enable"] = True
+                config["lion.battlepass.enabled"] = False
+                config["lion.battlepass.purchaseoptions.enabled"] = False
+                config["lion.champmastery.enabled"] = True
+                config["lion.champroster.bios.enabled"] = True
+                config["lion.champroster.enabled"] = True
+                config["lion.champroster.finishers.enabled"] = True
+                config["lion.champroster.skins.enabled"] = True
+                config["lion.champroster.skins.rarity.enabled"] = False
+                config["lion.champroster.taunts.enabled"] = True
+                config["lion.chat.quickchat.enabled"] = True
+                config["lion.client.version_set"] = {"default": "lionriot.prod"}
+                config["lion.client.version_set_v2"] = {"default": "lionriot.prod"}
+                config["lion.collections.enabled"] = True
+                config["lion.collections.stages.enabled"] = True
+                config["lion.friends.messagingenabled"] = True
+                config["lion.gaps_match_history.url"] = {
+                    "am": "https://usw2-red.pp.sgp.pvp.net",
+                    "apac": "https://apse1-red.pp.sgp.pvp.net",
+                    "eu": "https://euc1-red.pp.sgp.pvp.net"
+                }
+                config["lion.leaderboard.grouping"] = "default"
+                config["lion.leaderboard.name"] = "lion-apex"
+                config["lion.leaderboard.region"] = {
+                    "am": "na",
+                    "apac": "apse",
+                    "eu": "eu"
+                }
+                config["lion.leaderboards.enabled"] = True
+                config["lion.leaderboardsquerysgpendpoint"] = {
+                    "am": "https://usw2-red.pp.sgp.pvp.net",
+                    "apac": "https://apse1-red.pp.sgp.pvp.net",
+                    "eu": "https://euc1-red.pp.sgp.pvp.net"
+                }
+                config["lion.lobby.spectate.enabled"] = True
+                config["lion.matchhistory.enabled"] = True
+                config["lion.moderation.blockplayer.enabled"] = True
+                config["lion.moderation.penaltynotification.useplugintexts"] = False
+                config["lion.moderation.reporting.chatfilter.forcedoncountries"] = ["vnm"]
+                config["lion.moderation.reporting.enabled"] = True
+                config["lion.newshub.enabled"] = False
+                config["lion.newshub.page"] = "2xko-news-gallery"
+                config["lion.patchsieve.url"] = "https://sieve.services.riotcdn.net"
+                config["lion.player_affinity_environment"] = "live"
+                config["lion.player_feedback_tool.url"] = "https://pft-lion.rdatasrv.net"
+                config["lion.playercardsandtitles.enabled"] = True
+                config["lion.playerexpressions.enabled"] = True
+                config["lion.pooling.enabled"] = True
+                config["lion.progression.periodicmissions.enabled"] = True
+                config["lion.progression.ranked.enabled.byaffinity"] = {
+                    "am": False,
+                    "apac": False,
+                    "eu": False
+                }
+                config["lion.progressionseasonui.enabled"] = True
+                config["lion.publishing_content.url"] = "https://content.publishing.riotgames.com"
+                config["lion.riotstatus.enabled"] = False
+                config["lion.service.endpoint_v2"] = {
+                    "am": "https://prod-am.l.pvp.net:443",
+                    "apac": "https://prod-sea.l.pvp.net:443",
+                    "eu": "https://prod-eu.l.pvp.net:443"
+                }
+                config["lion.social.panel.enabled"] = True
+                config["lion.social.voicechat.duos.enabled"] = False
+                config["lion.social.voicechat.enabled"] = False
+                config["lion.spectate.fullscreencamera.disabled"] = True
+                config["lion.store.battlepass.enabled"] = False
+                config["lion.store.enabled"] = False
+                config["lion.store.payments.enabled"] = False
+                #config["lion.store.ps5_client_id"] = ""
+                config["lion.vanguard.netrequired"] = False
+                config["lion.vanguard.required"] = False
+
                 config["keystone.products.lion.full_name"] = "2XKO"
                 config["keystone.products.lion.patchlines.live"] = {
                 "locale_data": {
@@ -232,7 +312,7 @@ class ConfigProxy:
                             "platforms": None,
                             "product_id": ""
                         },
-                        "available_platforms": ["win", "playstation5", "xboxSeriesXS"],
+                        "available_platforms": ["win"],
                         "client_product_type": "riot_game",
                         "content_paths": {
                             "loc": "https://lion.secure.dyn.riotcdn.net/channels/public/rccontent/loc",
@@ -259,6 +339,29 @@ class ConfigProxy:
                         "default_theme_manifest": "https://lion.secure.dyn.riotcdn.net/channels/public/rccontent/theme/localized_manifest/ja_JP/manifest_jp.json",
                         "full_name": "2XKO",
                         "theme_manifest": "https://lion.secure.dyn.riotcdn.net/channels/public/rccontent/theme/localized_manifest/ja_JP/manifest_jp.json"
+                    },
+                    "kor": {
+                        "alias": {
+                            "platforms": None,
+                            "product_id": ""
+                        },
+                        "default_theme_manifest": "https://lion.secure.dyn.riotcdn.net/channels/public/rccontent/theme/localized_manifest/ko_KR/manifest_kr.json",
+                        "full_name": "2XKO",
+                        "theme_manifest": "https://lion.secure.dyn.riotcdn.net/channels/public/rccontent/theme/localized_manifest/ko_KR/manifest_kr.json"
+                    },
+                    "twn": {
+                        "alias": {
+                            "platforms": None,
+                            "product_id": ""
+                        },
+                        "client_product_type": "hidden"
+                    },
+                    "vnm": {
+                        "alias": {
+                            "platforms": None,
+                            "product_id": ""
+                        },
+                        "client_product_type": "hidden"
                     }
                 },
                 "platforms": {
@@ -287,12 +390,12 @@ class ConfigProxy:
                                 }
                             },
                             "patch_notes_url": "",
-                            "patch_url": "https://lion.secure.dyn.riotcdn.net/channels/public/releases/0B8FCE6E4B5C7A8B.manifest",
+                            "patch_url": "https://lion.secure.dyn.riotcdn.net/channels/public/releases/ABD9C52499329F91.manifest",
                             "secondary_patchlines": None,
                             "seed_url": "",
                             "tags": [],
                             "valid_shards": {
-                                "live": ["am", "sea", "nea", "eu"]
+                                "live": ["am", "apac", "sea", "nea", "eu"]
                             }
                         }],
                         "dependencies": None,
