@@ -1,40 +1,42 @@
-import subprocess, base64, websockets, ssl, asyncio, datetime
+import psutil, base64, websockets, ssl, asyncio, datetime
 from UiObjects import *
-
 
 class RiotWs:
     global_ws = None
     is_running = False
 
-    async def get_lockfile(self):
-        raw_output = subprocess.check_output([
-            'wmic',
-            'PROCESS',
-            'WHERE',
-            "name='Riot Client.exe' AND commandline LIKE '%--app-port%'",
-            'GET',
-            'commandline'
-        ],
-        stderr=subprocess.DEVNULL).decode('utf-8')
-        app_port = raw_output.split('--app-port=')[-1].split(' ')[0]
-        auth_token = raw_output.split('--remoting-auth-token=')[-1].split(' ')[0]
-        return app_port, auth_token
+    async def get_port_token(self):
+        return await asyncio.to_thread(self._get_port_token_sync)
+
+    def _get_port_token_sync(self):
+        for proc in psutil.process_iter(['name', 'cmdline']):
+            try:
+                if "Riot Client" in proc.info['name'] and any('--app-port' in arg for arg in proc.info['cmdline']):
+                    if proc.status() == psutil.STATUS_ZOMBIE:
+                        continue
+                    cmdline = proc.info['cmdline']
+                    app_port = [s.split('=')[1] for s in cmdline if s.startswith('--app-port=')][0]
+                    auth_token = [s.split('=')[1] for s in cmdline if s.startswith('--remoting-auth-token=')][0]
+                    return app_port, auth_token
+            except Exception as e:
+                continue
+        return None, None
 
     async def run(self):
         if self.is_running:
             return
         self.is_running = True
-        port, token = await self.get_lockfile()
-        while not port.strip() and self.is_running:
-            await asyncio.sleep(1.5)
-            port, token = await self.get_lockfile()
+        port, token = await self.get_port_token()
+        while port is None and token is None and self.is_running:
+            await asyncio.sleep(0.5)
+            port, token = await self.get_port_token()
 
         if not self.is_running:
             return
 
         url = "https://127.0.0.1:" + port
         headers = {
-            'Authorization': 'Basic ' + base64.b64encode(b'riot:' + token.encode()).decode(),
+            'Authorization': 'Basic ' + base64.b64encode(f"riot:{token}".encode("utf-8")).decode(),
             'Content-Type': 'application/json',
             'Accept': 'application/json'
         }

@@ -17,7 +17,7 @@ from SystemYaml import SystemYaml
 from ProxyServers import ProxyServers
 from UiObjects import UiObjects
 from RmsProxy import RmsProxy
-from LcuWebsocket import LcuWebsocket, LCUConnection
+from LcuWebsocket import LcuWebsocket
 from RiotWs import RiotWs
 
 # import logging
@@ -209,7 +209,6 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         SystemYaml.edit()
 
         self.proxies_started = False
-        self.custom_process = None
 
     def show_hide_args(self):
         if self.allTextRCArgs.isHidden():
@@ -497,37 +496,11 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                 #todo
                 QMessageBox.about(self, "Info", "RTMP custom requests are not ready yet")
             elif protocol == "LCU":
-                # todo get process async on lc launch
-                if not self.custom_process:
-                    self.custom_process = next(LCUConnection.return_ux_process(), None)
-                if self.custom_process:
-                    try:
-                        args = LCUConnection.process_args(self.custom_process)
-
-
-                        headers = {
-                            'Authorization': 'Basic ' + base64.b64encode(b'riot:' + args.lcu_token.encode()).decode(),
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json',
-                            'User-Agent': 'Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.36 '
-                                          '(KHTML, like Gecko) LeagueOfLegendsClient/14.9.581.9966 (CEF 91) Safari/537.36'
-                        }
-
-                        url = self.customHttpUrl.toPlainText().strip()
-
-                        if not url.startswith("http://") and not url.startswith("https://"):
-                            url = "https://127.0.0.1:" + str(args.lcu_port) + url
-                        elif url.startswith("https://127.0.0.1") and ":" not in url:
-                            url = url[:len("https://127.0.0.1")] + ":" + str(args.lcu_port) + url[len("https://127.0.0.1"):]
-
-                        response = requests.request(self.customHttpMethod.toPlainText().strip(),
-                                                    url,
-                                                    headers=headers, data=self.customText.toPlainText(),
-                                                    proxies=ProxyServers.fiddler_proxies, verify=False)
-
-                        HttpProxy.log_message(response)
-                    except psutil.NoSuchProcess:
-                        self.custom_process = None
+                loop = asyncio.get_event_loop()
+                loop.create_task(self.lcu_ws.request(self.customHttpMethod.toPlainText().strip(),
+                                    self.customHttpUrl.toPlainText().strip(),
+                                    self.customText.toPlainText(),
+                                    ProxyServers.fiddler_proxies))
 
         except Exception as e:
             print("Failed to send custom request ", e)
