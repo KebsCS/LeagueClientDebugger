@@ -20,6 +20,7 @@
 5. Close all running League and Riot clients
 6. `python3 main.py`, tested on python 3.9, 3.12 and 3.13
 7. Select your server and press the `Launch Client` button 
+8. If a game fails to launch, check for `vgk` and `vgc` services running and stop them. They often launch silently in the background, even with the `Disable Vanguard` option enabled.
 
 
 ## Development
