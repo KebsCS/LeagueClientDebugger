@@ -218,6 +218,7 @@ class HttpProxy:
         except Exception as e:
             print("json indent response failed")
             print(raw_response_str)
+            item.setData(257, raw_response_str)
 
         scrollbar = UiObjects.httpsList.verticalScrollBar()
         if not scrollbar or scrollbar.value() == scrollbar.maximum():

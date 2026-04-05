@@ -38,7 +38,8 @@ class ProxyServers:
         "https://support-wildrift.riotgames.com",
         "https://recovery.riotgames.com",
         "https://support.riotgames.com",
-        "https://update-account.riotgames.com"
+        "https://update-account.riotgames.com",
+        "https://am-a.akamaihd.net" # images hosting
     ]
 
     @staticmethod
