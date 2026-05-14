@@ -1,0 +1,4 @@
+{
+  "pfx_url": "https://your-host.example.com/localhost.pfx",
+  "chat_proxy_host": "localhost.your-domain.example.com"
+}

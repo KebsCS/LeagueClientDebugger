@@ -1,5 +1,6 @@
 import asyncio, requests, re, base64, json, platform
 from ChatProxy import ChatProxy
+from ChatCert import get_proxy_ssl_context, get_chat_proxy_host
 from HttpProxy import HttpProxy
 from ProxyServers import ProxyServers, find_free_port
 from UiObjects import UiObjects
@@ -419,9 +420,8 @@ class ConfigProxy:
                 if ConfigProxy.geo_pas_url == "":
                     ConfigProxy.geo_pas_url = config["keystone.player-affinity.playerAffinityServiceURL"] + "/pas/v1/service/chat"
 
-            replace_value("chat.use_tls.enabled", False)
-            replace_value("chat.host", "127.0.0.1")
-            replace_value("chat.allow_bad_cert.enabled", True)
+            chat_proxy_host = get_chat_proxy_host()
+            replace_value("chat.host", chat_proxy_host)
             if "chat.port" in config:
                 self.real_chat_port = config["chat.port"]
                 config["chat.port"] = self.chat_port
@@ -433,13 +433,18 @@ class ConfigProxy:
                     self.real_chat_host = config["chat.affinities"][affinity]
 
                 for host in config["chat.affinities"]:
-                    config["chat.affinities"][host] = "127.0.0.1"
+                    config["chat.affinities"][host] = chat_proxy_host
 
                 if not ConfigProxy.is_chat_proxy_running:
                     ConfigProxy.is_chat_proxy_running = True
                     chatProxy = ChatProxy()
                     loop = asyncio.get_event_loop()
-                    loop.create_task(chatProxy.start_client_proxy("127.0.0.1", self.chat_port, self.real_chat_host, self.real_chat_port))
+                    ssl_ctx = get_proxy_ssl_context()
+                    loop.create_task(chatProxy.start_client_proxy(
+                        "127.0.0.1", self.chat_port,
+                        self.real_chat_host, self.real_chat_port,
+                        ssl_ctx,
+                    ))
 
             return config
 

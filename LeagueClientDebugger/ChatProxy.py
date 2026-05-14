@@ -192,15 +192,17 @@ class ChatProxy:
 
         return message
 
-    async def start_client_proxy(self, proxy_host, proxy_port, real_host, real_port):
+    async def start_client_proxy(self, proxy_host, proxy_port, real_host, real_port, ssl_context=None):
         try:
             loop = asyncio.get_running_loop()
 
             server = await loop.create_server(
                 lambda: self.ProtocolFromClient(real_host, real_port),
-                proxy_host, proxy_port)
+                proxy_host, proxy_port,
+                ssl=ssl_context)
 
-            print(f'[XMPP] Proxy server started on {proxy_host}:{proxy_port}')
+            print(f'[XMPP] Proxy server started on {proxy_host}:{proxy_port}'
+                  f'{" (TLS)" if ssl_context is not None else ""}')
 
             async with server:
                 await server.serve_forever()
