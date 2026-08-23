@@ -1,7 +1,7 @@
 from DetachableTabWidget import DetachableTabWidget
 from PyQt5 import QtWidgets
 QtWidgets.QTabWidget = DetachableTabWidget
-import sys, json, time, os, io, asyncio, pymem, requests, gzip, re, base64, datetime, psutil, ctypes, shutil, platform, zlib
+import sys, json, time, os, io, asyncio, pymem, requests, gzip, re, base64, datetime, psutil, ctypes, platform, zlib
 from lxml import etree
 from PyQt5.uic import loadUiType # PyCharm bug, import works fine
 from PyQt5.QtCore import pyqtSlot, pyqtSignal, Qt, QEvent, QByteArray, QSize
@@ -19,6 +19,7 @@ from UiObjects import UiObjects
 from RmsProxy import RmsProxy
 from LcuWebsocket import LcuWebsocket
 from RiotWs import RiotWs
+import Hosts
 
 # import logging
 # logging.getLogger().setLevel(logging.WARNING)
@@ -1047,42 +1048,12 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
 
     @pyqtSlot()
     def on_miscButtonViewhosts_clicked(self):
-        os.startfile(os.getenv("SystemRoot", r"C:\Windows") + r"\System32\drivers\etc\hosts")
+        os.startfile(Hosts.get_hosts_path())
 
     def rewrite_etc_hosts(self, hostmap, save_code):
-        hosts_file = os.getenv("SystemRoot", r"C:\Windows") + r"\System32\drivers\etc\hosts"
-        backup_file = f'{hosts_file}.sbak'
-        append = f'# LeagueClientDebugger-{save_code}'
-
-        with open(hosts_file) as f:
-            old_content = f.read()
-
-        if old_content.strip() and not os.path.exists(backup_file):
-            try:
-                os.link(hosts_file, backup_file)
-            except OSError:
-                # File is locked, perform non-atomic copy
-                shutil.copyfile(hosts_file, backup_file)
-
-        temp = f"{hosts_file}.{save_code}.tmp"
-        try:
-            with open(temp, 'w') as f:
-                for line in old_content.rstrip().split('\n'):
-                    if append in line:
-                        continue
-                    f.write(f'{line}\n')
-
-                for host, ip in sorted(hostmap.items()):
-                    f.write(f'{ip} {host:<30} {append}\n')
-        except PermissionError:
+        if not Hosts.rewrite_etc_hosts(hostmap, save_code):
             QMessageBox.about(self, "No Administrator Rights", "To enable admin privileges for future debugging sessions, go to `Tools`->`Options` and select `Always run debugger as admin`")
             return False
-
-        try:
-            os.rename(temp, hosts_file)
-        except OSError:
-            # File is locked, perform non-atomic copy
-            shutil.move(temp, hosts_file)
 
         return True
 

@@ -1,4 +1,5 @@
 import asyncio, ssl, re, datetime
+from ChatCert import ChatCert
 from UiObjects import *
 
 
@@ -194,11 +195,21 @@ class ChatProxy:
 
     async def start_client_proxy(self, proxy_host, proxy_port, real_host, real_port):
         try:
+            ssl_context = ChatCert.get_ssl_context()
+            if not ssl_context:
+                print("[XMPP] Couldn't get a certificate, the chat proxy will not be started")
+                UiObjects.add_disconnected_item(UiObjects.xmppList, "- no chat certificate, check the console")
+                return
+
+            if not ChatCert.ensure_resolution():
+                print(f"[XMPP] Failed to make {ChatCert.domain} resolve to 127.0.0.1, "
+                      f"run the debugger as admin or change your dns server, chat might not work")
+
             loop = asyncio.get_running_loop()
 
             server = await loop.create_server(
                 lambda: self.ProtocolFromClient(real_host, real_port),
-                proxy_host, proxy_port)
+                proxy_host, proxy_port, ssl=ssl_context)
 
             print(f'[XMPP] Proxy server started on {proxy_host}:{proxy_port}')
 

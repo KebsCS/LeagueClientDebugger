@@ -1,4 +1,5 @@
 import asyncio, requests, re, base64, json, platform
+from ChatCert import ChatCert
 from ChatProxy import ChatProxy
 from HttpProxy import HttpProxy
 from ProxyServers import ProxyServers, find_free_port
@@ -442,9 +443,10 @@ class ConfigProxy:
                 if ConfigProxy.geo_pas_url == "":
                     ConfigProxy.geo_pas_url = config["keystone.player-affinity.playerAffinityServiceURL"] + "/pas/v1/service/chat"
 
-            replace_value("chat.use_tls.enabled", False)
-            replace_value("chat.host", "127.0.0.1")
-            replace_value("chat.allow_bad_cert.enabled", True)
+            # nowadays client ignores chat.allow_bad_cert.enabled,
+            # ChatCert.domain resolves to 127.0.0.1 and has a valid certificate
+            replace_value("chat.use_tls.enabled", True)
+            replace_value("chat.host", ChatCert.domain)
             if "chat.port" in config:
                 self.real_chat_port = config["chat.port"]
                 config["chat.port"] = self.chat_port
@@ -456,7 +458,7 @@ class ConfigProxy:
                     self.real_chat_host = config["chat.affinities"][affinity]
 
                 for host in config["chat.affinities"]:
-                    config["chat.affinities"][host] = "127.0.0.1"
+                    config["chat.affinities"][host] = ChatCert.domain
 
                 if not ConfigProxy.is_chat_proxy_running:
                     ConfigProxy.is_chat_proxy_running = True

@@ -6,3 +6,4 @@ LeagueClientDebugger/config*.json
 LeagueClientDebugger/fullconfig*.txt
 LeagueClientDebugger/all_requests*.txt
 LeagueClientDebugger/saves/
+LeagueClientDebugger/*.pem
