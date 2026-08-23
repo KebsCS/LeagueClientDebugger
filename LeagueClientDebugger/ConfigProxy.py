@@ -96,6 +96,28 @@ class ConfigProxy:
                     elif key_to_match in key:
                         d[key] = new_value
 
+            # Configs to disable patching and integrity checks (patch-proxy)
+            # commented out because the Play button might be not clickable
+            # which would require a call to POST /product-launcher/v1/products/league_of_legends/patchlines/live
+            # replace_value("patcher.scd.service_enabled", False)
+            # replace_value("keystone.client.feature_flags.patch_proxy_multiversion.enabled", False)
+            # replace_value("keystone.client.feature_flags.background_mode_patching.enabled", False)
+            # replace_value("keystone.client.feature_flags.eula.use_patch_downloader.enabled", False)
+            # replace_value("tft.client_settings.background_patching_enabled", False)
+            # replace_value("lol.client_settings.patch.use_compat_version", False)
+            # replace_value("keystone.client.feature_flags.autoPatch.disabled", True)
+            # replace_value("keystone.client.feature_flags.productIntegrationAppRepairs.enabled", False)
+            # replace_value("keystone.client.feature_flags.productIntegrationAppImmediateRepairs.enabled", False)
+            # replace_value("keystone.client.feature_flags.product_settings.keep_updated.enabled", False)
+            # replace_value("keystone.client.feature_flags.use_patch_proxy_v2.enabled", False)
+            # replace_value("keystone.client.feature_flags.fix_bad_install_locations.enabled", False)
+            # replace_value("keystone.client.feature_flags.product_update_scanner.enabled", False)
+            # replace_value("keystone.client.feature_flags.patch_proxy.enabled", False)
+            # replace_value("keystone.client.feature_flags.restart_required.disabled", True)
+            # replace_value("keystone.client.feature_flags.swr_caching.enabled", False)
+            # replace_value("keystone.client.feature_flags.restriction.enabled", False)
+
+
             # replace_value("keystone.client.feature_flags.chrome_devtools.enabled", True)
             #
             # replace_value("lol.client_settings.honeyfruit.account_claiming_enabled", True)
@@ -162,6 +184,7 @@ class ConfigProxy:
                 replace_value("lion.vanguard.netrequired", False)
                 replace_value("lion.vanguard.required", False)
                 replace_value("keystone.client.feature_flags.vanguardLaunch.disabled", True)
+                replace_value("keystone.client.feature_flags.onDemandVanguard.enabled", False)
 
                 def remove_vg_dependency(patchline: str):
                     if platform.system() == "Windows":

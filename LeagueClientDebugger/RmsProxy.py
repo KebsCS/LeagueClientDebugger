@@ -8,6 +8,12 @@ class RmsProxy:
     global_target_ws = None
     global_useragent = None
 
+    # websockets builds these itself, forwarding them would send them twice and the server answers 400
+    skipped_headers = {"host", "connection", "upgrade", "keep-alive", "te", "trailer",
+                       "transfer-encoding", "proxy-authorization", "proxy-authenticate", "origin",
+                       "sec-websocket-key", "sec-websocket-version", "sec-websocket-extensions",
+                       "sec-websocket-protocol", "sec-websocket-accept"}
+
     def __init__(self, real_host):  # wss://eu.edge.rms.si.riotgames.com:443
         parts = real_host.split(":")
         if len(parts) == 2:
@@ -22,15 +28,16 @@ class RmsProxy:
         target_hostname = self.real_host
 
         req_headers = dict(ws.request_headers)
+        lower_headers = {k.lower(): v for k, v in req_headers.items()}
 
-        if 'host' in req_headers:
-            req_headers['host'] = self.real_host.split("//")[-1] + ":" + self.real_port
-        if 'origin' in req_headers:
-            del req_headers['origin']
+        fwd_headers = {k: v for k, v in req_headers.items() if k.lower() not in RmsProxy.skipped_headers}
+        subprotocols = None
+        if 'sec-websocket-protocol' in lower_headers:
+            subprotocols = [p.strip() for p in lower_headers['sec-websocket-protocol'].split(",") if p.strip()]
 
         ws.useragent = ""
         try:
-            ws.useragent = re.search(r"(?<=\) ).+/.", req_headers["user-agent"]).group()
+            ws.useragent = re.search(r"(?<=\) ).+/.", lower_headers["user-agent"]).group()
         except:
             pass
             #print("[RMS] useragent error: ", req_headers)
@@ -62,7 +69,12 @@ class RmsProxy:
                 print("[RMS] Connection closed ", e)
                 UiObjects.add_disconnected_item(UiObjects.rmsList, str(ws.useragent))
 
-        async with websockets.connect(target_hostname + path, extra_headers=req_headers, ssl=ssl._create_unverified_context()) as target_ws:
+        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+
+        async with websockets.connect(target_hostname + path, extra_headers=fwd_headers, subprotocols=subprotocols,
+                                      ssl=ssl_context) as target_ws:
             RmsProxy.global_ws = ws
             RmsProxy.global_target_ws = target_ws
             RmsProxy.global_useragent = ws.useragent
