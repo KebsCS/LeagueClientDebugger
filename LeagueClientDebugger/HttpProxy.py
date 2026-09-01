@@ -283,17 +283,8 @@ class HttpProxy:
         except UnicodeDecodeError:
             item.setData(256, raw_request.hex())
 
-        raw_response_str = raw_response.decode()
-        try:
-            if "Content-Type" in response.headers and "json" in response.headers["Content-Type"] \
-                    and response.status_code.real != 204:
-                raw_response_split = raw_response_str.split("\r\n\r\n")
-                raw_response_str = raw_response_split[0] + "\r\n\r\n" + json.dumps(json.loads(raw_response_split[1]), indent=4)
-            item.setData(257, raw_response_str)
-        except Exception as e:
-            print("json indent response failed")
-            print(raw_response_str)
-            item.setData(257, raw_response_str)
+        item.setData(257, raw_response.decode())
+        item.setData(258, "http")
 
         scrollbar = UiObjects.httpsList.verticalScrollBar()
         if not scrollbar or scrollbar.value() == scrollbar.maximum():

@@ -116,6 +116,7 @@ class LcuWebsocket:
         text = f"[{current_time}] {data['eventType']} {data['uri']}"
         item.setText(text)
         item.setData(256, data)
+        item.setData(258, "lcu")
 
         scrollbar = UiObjects.lcuList.verticalScrollBar()
         if not scrollbar or scrollbar.value() == scrollbar.maximum():

@@ -178,11 +178,12 @@ class ChatProxy:
         elif message == " ":
             text += "heartbeat"
         else:
-            text += message
+            text += message.replace("\r", " ").replace("\n", " ")
 
         item.setText(text)
 
         item.setData(256, message)
+        item.setData(258, "xmpp")
 
         scrollbar = UiObjects.xmppList.verticalScrollBar()
         if not scrollbar or scrollbar.value() == scrollbar.maximum():

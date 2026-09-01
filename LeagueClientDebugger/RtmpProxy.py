@@ -50,6 +50,8 @@ def log_message(message, is_outgoing):
         item.setText(text + "handshake" if isinstance(message, bytes) else "")
         item.setData(256, str(message))
 
+    item.setData(258, "rtmp")
+
     scrollbar = UiObjects.rtmpList.verticalScrollBar()
     if not scrollbar or scrollbar.value() == scrollbar.maximum():
         UiObjects.rtmpList.addItem(item)

@@ -82,6 +82,7 @@ class RiotWs:
         text = f"[{current_time}] {data['eventType']} {data['uri']}"
         item.setText(text)
         item.setData(256, data)
+        item.setData(258, "rc")
 
         scrollbar = UiObjects.rcList.verticalScrollBar()
         if not scrollbar or scrollbar.value() == scrollbar.maximum():

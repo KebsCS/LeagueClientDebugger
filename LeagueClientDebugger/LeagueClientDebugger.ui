@@ -384,12 +384,9 @@
              </layout>
             </item>
             <item>
-             <widget class="QTextEdit" name="allView">
+             <widget class="QPlainTextEdit" name="allView">
               <property name="lineWrapMode">
-               <enum>QTextEdit::NoWrap</enum>
-              </property>
-              <property name="acceptRichText">
-               <bool>false</bool>
+               <enum>QPlainTextEdit::NoWrap</enum>
               </property>
              </widget>
             </item>
@@ -582,12 +579,9 @@
             <item>
              <layout class="QVBoxLayout" name="verticalLayout_13">
               <item>
-               <widget class="QTextEdit" name="xmppView">
+               <widget class="QPlainTextEdit" name="xmppView">
                 <property name="lineWrapMode">
-                 <enum>QTextEdit::NoWrap</enum>
-                </property>
-                <property name="acceptRichText">
-                 <bool>false</bool>
+                 <enum>QPlainTextEdit::NoWrap</enum>
                 </property>
                </widget>
               </item>
@@ -812,12 +806,9 @@
              <number>3</number>
             </property>
             <item>
-             <widget class="QTextEdit" name="rtmpView">
+             <widget class="QPlainTextEdit" name="rtmpView">
               <property name="lineWrapMode">
-               <enum>QTextEdit::NoWrap</enum>
-              </property>
-              <property name="acceptRichText">
-               <bool>false</bool>
+               <enum>QPlainTextEdit::NoWrap</enum>
               </property>
              </widget>
             </item>
@@ -964,12 +955,9 @@
             <item>
              <layout class="QVBoxLayout" name="verticalLayout_8">
               <item>
-               <widget class="QTextEdit" name="rmsView">
+               <widget class="QPlainTextEdit" name="rmsView">
                 <property name="lineWrapMode">
-                 <enum>QTextEdit::WidgetWidth</enum>
-                </property>
-                <property name="acceptRichText">
-                 <bool>false</bool>
+                 <enum>QPlainTextEdit::WidgetWidth</enum>
                 </property>
                </widget>
               </item>
@@ -1119,22 +1107,16 @@
              <number>3</number>
             </property>
             <item>
-             <widget class="QTextEdit" name="httpsRequest">
+             <widget class="QPlainTextEdit" name="httpsRequest">
               <property name="lineWrapMode">
-               <enum>QTextEdit::NoWrap</enum>
-              </property>
-              <property name="acceptRichText">
-               <bool>false</bool>
+               <enum>QPlainTextEdit::NoWrap</enum>
               </property>
              </widget>
             </item>
             <item>
-             <widget class="QTextEdit" name="httpsResponse">
+             <widget class="QPlainTextEdit" name="httpsResponse">
               <property name="lineWrapMode">
-               <enum>QTextEdit::NoWrap</enum>
-              </property>
-              <property name="acceptRichText">
-               <bool>false</bool>
+               <enum>QPlainTextEdit::NoWrap</enum>
               </property>
              </widget>
             </item>
@@ -1472,12 +1454,9 @@
                </layout>
               </item>
               <item>
-               <widget class="QTextEdit" name="valoView">
+               <widget class="QPlainTextEdit" name="valoView">
                 <property name="lineWrapMode">
-                 <enum>QTextEdit::NoWrap</enum>
-                </property>
-                <property name="acceptRichText">
-                 <bool>false</bool>
+                 <enum>QPlainTextEdit::NoWrap</enum>
                 </property>
                </widget>
               </item>
@@ -1653,12 +1632,9 @@
                </layout>
               </item>
               <item>
-               <widget class="QTextEdit" name="lcuView">
+               <widget class="QPlainTextEdit" name="lcuView">
                 <property name="lineWrapMode">
-                 <enum>QTextEdit::NoWrap</enum>
-                </property>
-                <property name="acceptRichText">
-                 <bool>false</bool>
+                 <enum>QPlainTextEdit::NoWrap</enum>
                 </property>
                </widget>
               </item>
@@ -1837,12 +1813,9 @@
                </layout>
               </item>
               <item>
-               <widget class="QTextEdit" name="rcView">
+               <widget class="QPlainTextEdit" name="rcView">
                 <property name="lineWrapMode">
-                 <enum>QTextEdit::NoWrap</enum>
-                </property>
-                <property name="acceptRichText">
-                 <bool>false</bool>
+                 <enum>QPlainTextEdit::NoWrap</enum>
                 </property>
                </widget>
               </item>
@@ -2196,7 +2169,7 @@
             <item>
              <layout class="QHBoxLayout" name="horizontalLayout_18">
               <item>
-               <widget class="QTextEdit" name="customHttpMethod">
+               <widget class="QLineEdit" name="customHttpMethod">
                 <property name="sizePolicy">
                  <sizepolicy hsizetype="Maximum" vsizetype="Maximum">
                   <horstretch>0</horstretch>
@@ -2212,22 +2185,10 @@
                 <property name="inputMethodHints">
                  <set>Qt::ImhUppercaseOnly</set>
                 </property>
-                <property name="verticalScrollBarPolicy">
-                 <enum>Qt::ScrollBarAlwaysOff</enum>
-                </property>
-                <property name="horizontalScrollBarPolicy">
-                 <enum>Qt::ScrollBarAlwaysOff</enum>
-                </property>
-                <property name="lineWrapMode">
-                 <enum>QTextEdit::NoWrap</enum>
-                </property>
-                <property name="acceptRichText">
-                 <bool>false</bool>
-                </property>
                </widget>
               </item>
               <item>
-               <widget class="QTextEdit" name="customHttpUrl">
+               <widget class="QLineEdit" name="customHttpUrl">
                 <property name="sizePolicy">
                  <sizepolicy hsizetype="Expanding" vsizetype="Maximum">
                   <horstretch>0</horstretch>
@@ -2243,42 +2204,24 @@
                 <property name="inputMethodHints">
                  <set>Qt::ImhNone</set>
                 </property>
-                <property name="verticalScrollBarPolicy">
-                 <enum>Qt::ScrollBarAlwaysOff</enum>
-                </property>
-                <property name="horizontalScrollBarPolicy">
-                 <enum>Qt::ScrollBarAlwaysOff</enum>
-                </property>
-                <property name="lineWrapMode">
-                 <enum>QTextEdit::NoWrap</enum>
-                </property>
-                <property name="acceptRichText">
-                 <bool>false</bool>
-                </property>
                </widget>
               </item>
              </layout>
             </item>
             <item>
-             <widget class="QTextEdit" name="customHttpHeaders">
+             <widget class="QPlainTextEdit" name="customHttpHeaders">
               <property name="enabled">
                <bool>true</bool>
               </property>
               <property name="lineWrapMode">
-               <enum>QTextEdit::NoWrap</enum>
-              </property>
-              <property name="acceptRichText">
-               <bool>false</bool>
+               <enum>QPlainTextEdit::NoWrap</enum>
               </property>
              </widget>
             </item>
             <item>
-             <widget class="QTextEdit" name="customText">
+             <widget class="QPlainTextEdit" name="customText">
               <property name="lineWrapMode">
-               <enum>QTextEdit::NoWrap</enum>
-              </property>
-              <property name="acceptRichText">
-               <bool>false</bool>
+               <enum>QPlainTextEdit::NoWrap</enum>
               </property>
              </widget>
             </item>

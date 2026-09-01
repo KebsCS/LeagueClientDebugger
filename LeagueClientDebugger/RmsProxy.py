@@ -103,6 +103,7 @@ class RmsProxy:
         item = QListWidgetItem()
         item.setText(item_text)
         item.setData(256, json_message)
+        item.setData(258, "rms")
 
         scrollbar = UiObjects.rmsList.verticalScrollBar()
         if not scrollbar or scrollbar.value() == scrollbar.maximum():

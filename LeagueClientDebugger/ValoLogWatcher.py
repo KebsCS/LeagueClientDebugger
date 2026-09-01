@@ -115,6 +115,7 @@ class ValoLogWatcher:
                 print(raw_response_str)
 
         item.setData(256, data)
+        item.setData(258, "valo")
 
         scrollbar = UiObjects.valoList.verticalScrollBar()
         if not scrollbar or scrollbar.value() == scrollbar.maximum():

@@ -7,7 +7,7 @@ from PyQt5.uic import loadUiType # PyCharm bug, import works fine
 from PyQt5.QtCore import pyqtSlot, pyqtSignal, Qt, QEvent, QByteArray, QSize
 from PyQt5.QtCore import QObject, QProcess, QItemSelection, QModelIndex
 from PyQt5.QtWidgets import QMessageBox, QFileDialog, QListWidgetItem, QTableWidgetItem, QComboBox, QPushButton
-from PyQt5.QtGui import QColor, QIcon, QTextCharFormat, QTextCursor, QPalette, QSyntaxHighlighter, QGuiApplication
+from PyQt5.QtGui import QColor, QIcon, QTextCharFormat, QTextCursor, QPalette, QSyntaxHighlighter, QGuiApplication, QFont, QFontMetricsF
 from qasync import QEventLoop, QApplication
 from ConfigProxy import ConfigProxy
 from ChatProxy import ChatProxy
@@ -35,13 +35,44 @@ JWT_PATTERN = r'eyJ[A-Za-z0-9=_-]+(?:\.[A-Za-z0-9=_-]+){2,}'
 GZIP_PATTERN = r'H4sIA[A-Za-z0-9/+=]+'
 
 #todo decode jwts and zips in all tabs not just start
-#todo add auto inject
+#todo add auto inject if vg is disabled
 #todo lcu settings, optimize code, relogging, multi client
-#todo speed up the listwidgets, maybe listview
 #todo, finish mitm tab, vairables for mitm, like $timestamp$ so its easy to use
-#todo logs tab with all client logs, File->Force close clients
+#todo logs tab with all client logs
 #todo pengu loader debloat plugin with easily editable blocklist config
 #todo update popup, default button in launch args, refactor main.py and config(default values etc)
+
+def pretty_http(raw: str) -> str:
+    if not raw:
+        return ""
+    head, separator, body = raw.partition("\r\n\r\n")
+    if not separator or not body.strip():
+        return raw
+    try:
+        return head + separator + json.dumps(json.loads(body), indent=4)
+    except Exception:  # not json
+        return raw
+
+
+def pretty_xml(xml_string: str) -> str:
+    try:
+        root = etree.fromstring(xml_string.encode("utf-8"))
+        return etree.tostring(root, pretty_print=True).decode()
+    except etree.XMLSyntaxError:
+        return xml_string
+
+
+def entry_text(item: QListWidgetItem) -> str:
+    data = item.data(256)
+    kind = item.data(258)
+    if kind == "http":
+        return pretty_http(data) + "\n\n\n" + pretty_http(item.data(257))
+    if kind == "xmpp":
+        return pretty_xml(data)
+    if kind in ("rms", "lcu", "rc"):
+        return json.dumps(data, indent=4)
+    # rtmp already formatted
+    return data if data else ""
 
 Ui_LeagueClientDebuggerClass, _ = loadUiType(os.path.join(os.path.dirname(os.path.abspath(__file__)), "LeagueClientDebugger.ui"))
 class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
@@ -134,6 +165,12 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         UiObjects.lcuList = self.lcuList
         UiObjects.rcList = self.rcList
 
+        for messageList in (self.allList, self.xmppList, self.rtmpList, self.rmsList,
+                             self.httpsList, self.valoList, self.lcuList, self.rcList):
+            messageList.setUniformItemSizes(True)
+            messageList.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            messageList.setTextElideMode(Qt.ElideRight)
+
         self.allTextSearch.installEventFilter(self)
         self.xmppTextSearch.installEventFilter(self)
         self.rtmpTextSearch.installEventFilter(self)
@@ -151,6 +188,18 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         self.tab_valo.installEventFilter(self)
         self.tab_lcu.installEventFilter(self)
         self.tab_rc.installEventFilter(self)
+
+        mono = QFont("Consolas")
+        mono.setStyleHint(QFont.Monospace)
+        mono.setPointSize(9)
+        for view in (self.allView, self.xmppView, self.rtmpView, self.rmsView,
+                     self.httpsRequest, self.httpsResponse, self.valoView,
+                     self.lcuView, self.rcView, self.customText, self.customHttpHeaders):
+            view.setFont(mono)
+            view.setTabStopDistance(4 * QFontMetricsF(mono).horizontalAdvance(' '))
+
+        self.customHttpMethod.setFont(mono)
+        self.customHttpUrl.setFont(mono)
 
         self.xmppList.model().rowsInserted.connect(
             lambda parent, start, end: self.add_item_to_all(self.xmppList, start))
@@ -411,10 +460,10 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                     self.customHttpMethod.setText(item.data(256))
                     self.customHttpUrl.setText(item.data(257))
                     if protocol != "LCU":
-                        self.customHttpHeaders.setText(item.data(258))
-                    self.customText.setText(item.data(259))
+                        self.customHttpHeaders.setPlainText(item.data(258))
+                    self.customText.setPlainText(item.data(259))
                 else:
-                    self.customText.setText(self.customTable.item(row, 3).text())
+                    self.customText.setPlainText(self.customTable.item(row, 3).text())
                 break
 
     def on_custom_remove_clicked(self):
@@ -439,9 +488,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         self.customTable.setItem(rowCount, 2, QTableWidgetItem(self.customComboDetination.currentText()))
         if protocol == "HTTP/S" or protocol == "LCU":
             item = QTableWidgetItem()
-            item.setText(self.customHttpMethod.toPlainText() + " " + self.customHttpUrl.toPlainText())
-            item.setData(256, self.customHttpMethod.toPlainText())
-            item.setData(257, self.customHttpUrl.toPlainText())
+            item.setText(self.customHttpMethod.text() + " " + self.customHttpUrl.text())
+            item.setData(256, self.customHttpMethod.text())
+            item.setData(257, self.customHttpUrl.text())
             if protocol != "LCU":
                 item.setData(258, self.customHttpHeaders.toPlainText())
             item.setData(259, self.customText.toPlainText())
@@ -466,7 +515,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             if protocol == "HTTP/S":
 
                 headers_dict = {line.split(': ')[0]: line.split(': ')[1] for line in self.customHttpHeaders.toPlainText().strip().splitlines()}
-                response = requests.request(self.customHttpMethod.toPlainText().strip(), self.customHttpUrl.toPlainText().strip(),
+                response = requests.request(self.customHttpMethod.text().strip(), self.customHttpUrl.text().strip(),
                                  headers=headers_dict, data=self.customText.toPlainText(),
                                  proxies=ProxyServers.fiddler_proxies, verify=False)
 
@@ -498,8 +547,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                 QMessageBox.about(self, "Info", "RTMP custom requests are not ready yet")
             elif protocol == "LCU":
                 loop = asyncio.get_event_loop()
-                loop.create_task(self.lcu_ws.request(self.customHttpMethod.toPlainText().strip(),
-                                    self.customHttpUrl.toPlainText().strip(),
+                loop.create_task(self.lcu_ws.request(self.customHttpMethod.text().strip(),
+                                    self.customHttpUrl.text().strip(),
                                     self.customText.toPlainText(),
                                     ProxyServers.fiddler_proxies))
 
@@ -514,9 +563,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         if row == -1:
             return
         item = self.allList.item(row)
-        data = item.data(256)
-        text = json.dumps(data, indent=4) if isinstance(data, dict) else data
-        self.allView.setText(text)
+        text = entry_text(item)
+        self.allView.setPlainText(text)
 
         matches_jwt = re.findall(JWT_PATTERN, text)
         matches_gzip = re.findall(GZIP_PATTERN, text)
@@ -569,30 +617,19 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                     except Exception:
                         pass
 
-            self.allView.setText(text)
+            self.allView.setPlainText(text)
             self.allView.verticalScrollBar().setValue(scroll_value)
             self.allButtonDecodeJWTs.setText("Original text")
             self.is_decoded = True
         else:
-            self.allView.setText(self.original_text)  # Restore original text
+            self.allView.setPlainText(self.original_text)  # Restore original text
             self.allView.verticalScrollBar().setValue(scroll_value)
             self.allButtonDecodeJWTs.setText("Decode JWTs and GZIPs")
             self.is_decoded = False
 
     @pyqtSlot(int)
     def on_xmppList_currentRowChanged(self, row):
-        if row == -1:
-            return
-        item = self.xmppList.item(row)
-
-        def pretty_xml(xml_string):
-            try:
-                root = etree.fromstring(xml_string.encode("utf-8"))
-                return etree.tostring(root, pretty_print=True).decode()
-            except etree.XMLSyntaxError:
-                return xml_string
-
-        self.xmppView.setText(pretty_xml(item.data(256)))
+        self.show_entry(self.xmppList, self.xmppView, row)
 
 
     @pyqtSlot()
@@ -604,48 +641,38 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         cb.setText(self.xmppList.selectedItems()[0].data(256), mode=cb.Clipboard)
 
 
-    @pyqtSlot(int)
-    def on_rtmpList_currentRowChanged(self, row):
+    def show_entry(self, list_widget, view, row):
         if row == -1:
             return
-        item = self.rtmpList.item(row)
-        self.rtmpView.setText(item.data(256))
+        view.setPlainText(entry_text(list_widget.item(row)))
+
+    @pyqtSlot(int)
+    def on_rtmpList_currentRowChanged(self, row):
+        self.show_entry(self.rtmpList, self.rtmpView, row)
 
     @pyqtSlot(int)
     def on_rmsList_currentRowChanged(self, row):
-        if row == -1:
-            return
-        item = self.rmsList.item(row)
-        self.rmsView.setText(json.dumps(item.data(256), indent=4))
+        self.show_entry(self.rmsList, self.rmsView, row)
 
     @pyqtSlot(int)
     def on_httpsList_currentRowChanged(self, row):
         if row == -1:
             return
         item = self.httpsList.item(row)
-        self.httpsRequest.setText(item.data(256))
-        self.httpsResponse.setText(item.data(257))
+        self.httpsRequest.setPlainText(pretty_http(item.data(256)))
+        self.httpsResponse.setPlainText(pretty_http(item.data(257)))
 
     @pyqtSlot(int)
     def on_valoList_currentRowChanged(self, row):
-        if row == -1:
-            return
-        item = self.valoList.item(row)
-        self.valoView.setText(item.data(256))
+        self.show_entry(self.valoList, self.valoView, row)
 
     @pyqtSlot(int)
     def on_lcuList_currentRowChanged(self, row):
-        if row == -1:
-            return
-        item = self.lcuList.item(row)
-        self.lcuView.setText(json.dumps(item.data(256), indent=4))
+        self.show_entry(self.lcuList, self.lcuView, row)
 
     @pyqtSlot(int)
     def on_rcList_currentRowChanged(self, row):
-        if row == -1:
-            return
-        item = self.rcList.item(row)
-        self.rcView.setText(json.dumps(item.data(256), indent=4))
+        self.show_entry(self.rcList, self.rcView, row)
 
     @pyqtSlot()
     def on_allButtonSearch_clicked(self):
@@ -654,9 +681,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             return
         for index in range(self.allList.count()):
             item = self.allList.item(index)
-            text = item.data(256) if item.data(256) else " "
-            if isinstance(text, dict):
-                text = json.dumps(text)
+            text = entry_text(item) or " "
 
             # todo, merge decoding functions with decode button
             if UiObjects.optionsIncludeJWTs.isChecked():
@@ -911,9 +936,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                 item = self.allList.item(index)
                 if item is not None:
                     file.write(item.text() + '\r\n')
-                    data = item.data(256)
-                    data = json.dumps(data, indent=4) if isinstance(data, dict) else data
-                    file.write(data.replace('\r\n', '\n') + '\r\n\r\n')
+                    file.write(entry_text(item).replace('\r\n', '\n') + '\r\n\r\n')
 
 
     @pyqtSlot()
@@ -966,22 +989,12 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
 
         if list_widget is self.xmppList:
             item.setIcon(self.icon_xmpp)
-
-            def pretty_xml(xml_string):
-                try:
-                    root = etree.fromstring(xml_string.encode("utf-8"))
-                    return etree.tostring(root, pretty_print=True).decode()
-                except etree.XMLSyntaxError:
-                    return xml_string
-            item.setData(256, pretty_xml(item.data(256)))
         elif list_widget is self.rtmpList:
             item.setIcon(self.icon_rtmp)
         elif list_widget is self.rmsList:
             item.setIcon(self.icon_rms)
         elif list_widget is self.httpsList:
             item.setIcon(self.icon_http)
-            text = item.data(256) + "\n\n\n" + item.data(257)
-            item.setData(256, text)
         elif list_widget is self.valoList:
             item.setIcon(self.icon_valo)
         elif list_widget is self.lcuList:
