@@ -132,6 +132,7 @@ class Amf0Decoder:
             result[key] = self.decode()
 
         Amf0Decoder.known_objects.append(result.values())
+        return result
 
     def read_list(self):
         obj = []

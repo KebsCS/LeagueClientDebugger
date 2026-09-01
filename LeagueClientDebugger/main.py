@@ -1401,6 +1401,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
     def closeEvent(self, event):
         #todo close all proxies
         self.SaveConfig()
+        HttpProxy.executor.shutdown(wait=False, cancel_futures=True)
         HttpProxy.session.close()
         event.accept()
 

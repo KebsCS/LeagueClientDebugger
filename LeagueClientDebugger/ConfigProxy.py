@@ -2,7 +2,7 @@ import asyncio, requests, re, base64, json, platform
 from ChatCert import ChatCert
 from ChatProxy import ChatProxy
 from HttpProxy import HttpProxy
-from ProxyServers import ProxyServers, find_free_port
+from ProxyServers import ProxyServers, find_free_port, REQUEST_TIMEOUT
 from UiObjects import UiObjects
 
 
@@ -23,7 +23,7 @@ class ConfigProxy:
 
             self.chat_port = chat_port
 
-        def edit_response(self, response: requests.Response) -> requests.Response:
+        async def edit_response(self, response: requests.Response) -> requests.Response:
             if response.status_code == 403:
                 raise Exception("Client config Cloudflare blocked, open a github issue or message on discord")
 
@@ -60,7 +60,7 @@ class ConfigProxy:
                 return new_text
 
             original_config = response.json()
-            config = json.dumps(self.edit_config(original_config))
+            config = json.dumps(await self.edit_config(original_config))
 
             if UiObjects.miscDowngradeLCEnabled.isChecked():
                 config = re.sub(r"(\w+)\.ledge\.leagueoflegends\.com", r"\1-red.lol.sgp.pvp.net", config)
@@ -80,7 +80,7 @@ class ConfigProxy:
             response._content = config.encode()
             return response
 
-        def edit_config(self, config):
+        async def edit_config(self, config):
             for key in config.keys():
                 if key not in ConfigProxy.full_config:
                     ConfigProxy.full_config[key] = config[key]
@@ -237,207 +237,12 @@ class ConfigProxy:
                             if "launchable_on_update_fail" in node:
                                 node["launchable_on_update_fail"] = True
 
-            missing_lion_patchline = False
             for key in config.keys():
                 if ".use_ledge" in key:
                     config[key] = True
 
                 if "keystone.products.league_of_legends.patchlines." in key:
                     override_system_yaml(key)
-
-                if re.search(r"keystone\.products\.(?!lion\.)\w+\.patchlines\.", key):
-                    missing_lion_patchline = True
-
-            if missing_lion_patchline:
-                config["lion.achievements.enabled"] = True
-                config["lion.analytics.collector_endpoint"] = "data.riotgames.com"
-                config["lion.analytics.enable"] = True
-                config["lion.battlepass.enabled"] = False
-                config["lion.battlepass.purchaseoptions.enabled"] = False
-                config["lion.champmastery.enabled"] = True
-                config["lion.champroster.bios.enabled"] = True
-                config["lion.champroster.enabled"] = True
-                config["lion.champroster.finishers.enabled"] = True
-                config["lion.champroster.skins.enabled"] = True
-                config["lion.champroster.skins.rarity.enabled"] = False
-                config["lion.champroster.taunts.enabled"] = True
-                config["lion.chat.quickchat.enabled"] = True
-                config["lion.client.version_set"] = {"default": "lionriot.prod"}
-                config["lion.client.version_set_v2"] = {"default": "lionriot.prod"}
-                config["lion.collections.enabled"] = True
-                config["lion.collections.stages.enabled"] = True
-                config["lion.friends.messagingenabled"] = True
-                config["lion.gaps_match_history.url"] = {
-                    "am": "https://usw2-red.pp.sgp.pvp.net",
-                    "apac": "https://apse1-red.pp.sgp.pvp.net",
-                    "eu": "https://euc1-red.pp.sgp.pvp.net"
-                }
-                config["lion.leaderboard.grouping"] = "default"
-                config["lion.leaderboard.name"] = "lion-apex"
-                config["lion.leaderboard.region"] = {
-                    "am": "na",
-                    "apac": "apse",
-                    "eu": "eu"
-                }
-                config["lion.leaderboards.enabled"] = True
-                config["lion.leaderboardsquerysgpendpoint"] = {
-                    "am": "https://usw2-red.pp.sgp.pvp.net",
-                    "apac": "https://apse1-red.pp.sgp.pvp.net",
-                    "eu": "https://euc1-red.pp.sgp.pvp.net"
-                }
-                config["lion.lobby.spectate.enabled"] = True
-                config["lion.matchhistory.enabled"] = True
-                config["lion.moderation.blockplayer.enabled"] = True
-                config["lion.moderation.penaltynotification.useplugintexts"] = False
-                config["lion.moderation.reporting.chatfilter.forcedoncountries"] = ["vnm"]
-                config["lion.moderation.reporting.enabled"] = True
-                config["lion.newshub.enabled"] = False
-                config["lion.newshub.page"] = "2xko-news-gallery"
-                config["lion.patchsieve.url"] = "https://sieve.services.riotcdn.net"
-                config["lion.player_affinity_environment"] = "live"
-                config["lion.player_feedback_tool.url"] = "https://pft-lion.rdatasrv.net"
-                config["lion.playercardsandtitles.enabled"] = True
-                config["lion.playerexpressions.enabled"] = True
-                config["lion.pooling.enabled"] = True
-                config["lion.progression.periodicmissions.enabled"] = True
-                config["lion.progression.ranked.enabled.byaffinity"] = {
-                    "am": False,
-                    "apac": False,
-                    "eu": False
-                }
-                config["lion.progressionseasonui.enabled"] = True
-                config["lion.publishing_content.url"] = "https://content.publishing.riotgames.com"
-                config["lion.riotstatus.enabled"] = False
-                config["lion.service.endpoint_v2"] = {
-                    "am": "https://prod-am.l.pvp.net:443",
-                    "apac": "https://prod-sea.l.pvp.net:443",
-                    "eu": "https://prod-eu.l.pvp.net:443"
-                }
-                config["lion.social.panel.enabled"] = True
-                config["lion.social.voicechat.duos.enabled"] = False
-                config["lion.social.voicechat.enabled"] = False
-                config["lion.spectate.fullscreencamera.disabled"] = True
-                config["lion.store.battlepass.enabled"] = False
-                config["lion.store.enabled"] = False
-                config["lion.store.payments.enabled"] = False
-                #config["lion.store.ps5_client_id"] = ""
-                config["lion.vanguard.netrequired"] = False
-                config["lion.vanguard.required"] = False
-
-                config["keystone.products.lion.full_name"] = "2XKO"
-                config["keystone.products.lion.patchlines.live"] = {
-                "locale_data": {
-                    "available_locales": ["en_US", "ja_JP"],
-                    "default_locale": "en_US"
-                },
-                "metadata": {
-                    "default": {
-                        "alias": {
-                            "platforms": None,
-                            "product_id": ""
-                        },
-                        "available_platforms": ["win"],
-                        "client_product_type": "riot_game",
-                        "content_paths": {
-                            "loc": "https://lion.secure.dyn.riotcdn.net/channels/public/rccontent/loc",
-                            "riotstatus": "https://lion.secure.dyn.riotcdn.net/channels/public",
-                            "social": "https://lion.secure.dyn.riotcdn.net/channels/public/rccontent/social"
-                        },
-                        "full_name": "2XKO",
-                        "patch_notes": "https://lion.scd.riotcdn.net/keystone-patchnotes/stable/patch-notes.json",
-                        "path_name": "2XKO/Live",
-                        "rso_client_id": "lion-client",
-                        "theme_manifest": "https://lion.secure.dyn.riotcdn.net/channels/public/rccontent/theme/manifest.json"
-                    },
-                    "installer": {
-                        "alias": {
-                            "platforms": None,
-                            "product_id": ""
-                        }
-                    },
-                    "jpn": {
-                        "alias": {
-                            "platforms": None,
-                            "product_id": ""
-                        },
-                        "default_theme_manifest": "https://lion.secure.dyn.riotcdn.net/channels/public/rccontent/theme/localized_manifest/ja_JP/manifest_jp.json",
-                        "full_name": "2XKO",
-                        "theme_manifest": "https://lion.secure.dyn.riotcdn.net/channels/public/rccontent/theme/localized_manifest/ja_JP/manifest_jp.json"
-                    },
-                    "kor": {
-                        "alias": {
-                            "platforms": None,
-                            "product_id": ""
-                        },
-                        "default_theme_manifest": "https://lion.secure.dyn.riotcdn.net/channels/public/rccontent/theme/localized_manifest/ko_KR/manifest_kr.json",
-                        "full_name": "2XKO",
-                        "theme_manifest": "https://lion.secure.dyn.riotcdn.net/channels/public/rccontent/theme/localized_manifest/ko_KR/manifest_kr.json"
-                    },
-                    "twn": {
-                        "alias": {
-                            "platforms": None,
-                            "product_id": ""
-                        },
-                        "client_product_type": "hidden"
-                    },
-                    "vnm": {
-                        "alias": {
-                            "platforms": None,
-                            "product_id": ""
-                        },
-                        "client_product_type": "hidden"
-                    }
-                },
-                "platforms": {
-                    "win": {
-                        "auto_patch": False,
-                        "configurations": [{
-                            "allowed_http_fallback_hostnames": None,
-                            "bundles_url": "",
-                            "dependencies": [{
-                                "args": ["/silent"],
-                                "elevate": True,
-                                "hash": "",
-                                "id": "DirectX",
-                                "min_version": "1.0.0",
-                                "url": "https://valorant.secure.dyn.riotcdn.net/x/riotclient/dependencies/DirectX_20190310.exe",
-                                "version": "1.0.0"
-                            }],
-                            "entitlements": None,
-                            "excluded_paths": None,
-                            "id": "default",
-                            "launchable_on_update_fail": False,
-                            "metadata": {
-                                "alias": {
-                                    "platforms": None,
-                                    "product_id": ""
-                                }
-                            },
-                            "patch_notes_url": "",
-                            "patch_url": "https://lion.secure.dyn.riotcdn.net/channels/public/releases/ABD9C52499329F91.manifest",
-                            "secondary_patchlines": None,
-                            "seed_url": "",
-                            "tags": [],
-                            "valid_shards": {
-                                "live": ["am", "apac", "sea", "nea", "eu"]
-                            }
-                        }],
-                        "dependencies": None,
-                        "deprecated_cloudfront_id": "",
-                        "icon_path": "https://lion.secure.dyn.riotcdn.net/channels/public/rccontent/theme/2XKO.ico",
-                        "install_dir": "2XKO/Live",
-                        "launcher": {
-                            "arguments": [f"--client-config-url=http://127.0.0.1:{ProxyServers.client_config_port}", "--client-id=lion-client", "--riotgamesapi-settings={settings-token}", "-remoting-app-port={remoting-app-port}", "-remoting-auth-token={remoting-auth-token}"],
-                            "component_id": "",
-                            "executables": {
-                                "app": "Lion.exe",
-                                "exe": "Lion.exe"
-                            }
-                        }
-                    }
-                },
-                "version": ""
-            }
 
             if "keystone.player-affinity.playerAffinityServiceURL" in config:
                 if ConfigProxy.geo_pas_url == "":
@@ -452,8 +257,11 @@ class ConfigProxy:
                 config["chat.port"] = self.chat_port
             if "chat.affinities" in config:
                 if "chat.affinity.enabled" in config and self.real_chat_host == "":
-                    pas = requests.get(ConfigProxy.geo_pas_url, headers={"Authorization": self.req.headers["Authorization"]},
-                                       proxies=ProxyServers.fiddler_proxies, verify=False)
+                    # off the event loop, this runs while the client waits for its config
+                    pas = await asyncio.to_thread(requests.get, ConfigProxy.geo_pas_url,
+                                                  headers={"Authorization": self.current_req.headers["Authorization"]},
+                                                  proxies=ProxyServers.fiddler_proxies, verify=False,
+                                                  timeout=REQUEST_TIMEOUT)
                     affinity = json.loads((base64.b64decode(str(pas.text).split('.')[1] + '==')))["affinity"]
                     self.real_chat_host = config["chat.affinities"][affinity]
 

@@ -1,5 +1,12 @@
 import socket
 
+# (connect, read) timeouts. Requests are forwarded from a thread pool, but without a
+# timeout a hung upstream would still pin a worker forever and eventually starve the pool
+REQUEST_TIMEOUT = (10, 60)
+
+# how many requests may be forwarded at once, each one occupies a worker thread
+MAX_CONCURRENT_REQUESTS = 32
+
 
 def find_free_port():
     with socket.socket() as s:

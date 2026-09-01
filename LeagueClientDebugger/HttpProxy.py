@@ -1,8 +1,9 @@
-import asyncio, requests, ssl, gzip, datetime, re
+import asyncio, requests, ssl, gzip, datetime, re, threading
+from concurrent.futures import ThreadPoolExecutor
 from httptools import HttpRequestParser
 from requests.adapters import HTTPAdapter
 from typing import Any
-from ProxyServers import ProxyServers
+from ProxyServers import ProxyServers, REQUEST_TIMEOUT, MAX_CONCURRENT_REQUESTS
 from ValoLogWatcher import ValoLogWatcher
 from UiObjects import *
 
@@ -29,6 +30,33 @@ CIPHERS = [
     "AES256-SHA",
     "DES-CBC3-SHA"
 ]
+
+
+class LockedCookieJar(requests.cookies.RequestsCookieJar):
+    """requests.Session isn't thread safe. Now that requests are forwarded from a thread
+    pool, the cookie jar is the one piece of shared mutable state that isn't already
+    guarded: preparing a request iterates the jar (merge_cookies) without taking the
+    jar's own lock, so a response storing a cookie at the same time raises
+    "dictionary changed size during iteration". urllib3's connection pools are thread
+    safe, so locking the iteration and the writes is enough.
+    The jar is shared on purpose - the client relies on it whenever
+    optionsClientHandlesCookies is off, see CustomProtocol.on_header"""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._jar_lock = threading.RLock()
+
+    def __iter__(self):
+        with self._jar_lock:
+            return iter(list(super().__iter__()))
+
+    def set_cookie(self, *args, **kwargs):
+        with self._jar_lock:
+            return super().set_cookie(*args, **kwargs)
+
+    def clear(self, *args, **kwargs):
+        with self._jar_lock:
+            return super().clear(*args, **kwargs)
 
 
 class SSLAdapter(HTTPAdapter):
@@ -62,23 +90,40 @@ class HttpProxy:
     userinfo_token = "" # not consistently updated, only used for rtmp player-preferences
 
     session = requests.sessions.Session()
-    session.mount('https://', SSLAdapter())
+    # one session is shared by every host proxy, so the pool has to hold more than the
+    # default 10 connections, otherwise urllib3 keeps discarding and reopening them
+    session.mount('https://', SSLAdapter(pool_connections=64, pool_maxsize=MAX_CONCURRENT_REQUESTS))
+    session.cookies = LockedCookieJar()
+
+    # requests are forwarded here instead of on the event loop, which also runs the Qt ui
+    # and every other proxy - a blocking call there stalls all of them at once
+    executor = ThreadPoolExecutor(max_workers=MAX_CONCURRENT_REQUESTS, thread_name_prefix="http-proxy")
 
     class CustomProtocol(asyncio.Protocol):
         def __init__(self, original_host: str):
             self.parser = None
             self.req = Request()
             self.original_host = original_host
+            self.transport = None
+            self.current_req = self.req  # the request being forwarded right now
+
+            # answers have to arrive in the order they were requested, so every
+            # connection forwards its own requests one by one. Different connections still
+            # run in parallel, which is where the concurrency comes from
+            self.queue = asyncio.Queue()
+            self.pump_task = None
 
         def connection_made(self, transport):
             peername = transport.get_extra_info('peername')
             #print('[HttpProxy] Connection from {}'.format(peername))
             self.transport = transport
-            #self.session = requests.sessions.Session()
+            self.pump_task = asyncio.get_running_loop().create_task(self.pump())
 
         def connection_lost(self, exc):
+            if self.pump_task:
+                self.pump_task.cancel()
+                self.pump_task = None
             self.transport.close()
-            #self.session.close()
 
         def data_received(self, data):
             #print(data.decode())
@@ -112,7 +157,7 @@ class HttpProxy:
 
             return request
 
-        def edit_response(self, response: requests.Response) -> requests.Response:
+        async def edit_response(self, response: requests.Response) -> requests.Response:
             if response.url.startswith("https://auth.") and response.url.endswith("/.well-known/openid-configuration"):
                 response._content = re.sub(
                     r"https://auth\.(riotgames|esports\.rpg\.riotgames)\.com",
@@ -148,30 +193,60 @@ class HttpProxy:
             return response
 
         def send_response(self, response: bytes):
-            self.transport.write(response)
+            # the client can disconnect while its request is still in flight
+            if self.transport and not self.transport.is_closing():
+                self.transport.write(response)
 
         def on_message_complete(self):
             self.req.headers["Host"] = self.original_host.split("//")[1]
             self.req.url = "https://" + self.req.headers["Host"] + self.req.url
 
-            self.req = self.edit_request(self.req)
+            self.queue.put_nowait(self.req)
+            self.req = Request()  # the connection is kept alive, don't touch the queued request anymore
 
-            response = HttpProxy.session.request(self.req.method, self.req.url, headers=self.req.headers, data=self.req.body,
-                                                 proxies=ProxyServers.fiddler_proxies, verify=False)
+        async def pump(self):
+            """Forwards the requests of this connection one by one"""
+            loop = asyncio.get_running_loop()
+            while True:
+                req = await self.queue.get()
+                try:
+                    req = self.current_req = self.edit_request(req)
+                    response = await loop.run_in_executor(HttpProxy.executor, self.forward, req)
+                    await self.handle_response(req, response)
+                except asyncio.CancelledError:
+                    raise
+                except Exception as e:
+                    print(f"[HttpProxy] {req.method} {req.url} failed: {e!r}")
+                    # sent when a request couldn't be forwarded
+                    self.send_response((b"HTTP/1.1 502 Bad Gateway\r\n"
+                        b"Content-Length: 0\r\n"
+                        b"Connection: close\r\n"
+                        b"\r\n"))
+                    if self.transport:
+                        self.transport.close()  # the client shouldn't reuse this connection
+                    return
 
-            if self.req.url == "https://entitlements.auth.riotgames.com/api/token/v1" and not HttpProxy.is_valo_log_running:
+        @staticmethod
+        def forward(req: Request) -> requests.Response:
+            """Runs on a worker thread, so it must not touch qt widgets or the event loop"""
+            return HttpProxy.session.request(req.method, req.url, headers=req.headers, data=req.body,
+                                             proxies=ProxyServers.fiddler_proxies, verify=False,
+                                             timeout=REQUEST_TIMEOUT)
+
+        async def handle_response(self, req: Request, response: requests.Response):
+            if req.url == "https://entitlements.auth.riotgames.com/api/token/v1" and not HttpProxy.is_valo_log_running:
                 HttpProxy.is_valo_log_running = True
-                auth = self.req.headers["Authorization"]
+                auth = req.headers["Authorization"]
                 entitlements = response.json()["entitlements_token"]
                 valo_log = ValoLogWatcher(auth, entitlements)
                 asyncio.create_task(valo_log.run())
 
             # valid for 1h, best to get a new one when it's refreshed, although this isn't too important as
             # I think player-preferences are sent only at beginning after login and client doesn't rely on them
-            if "https://player-preferences" in self.req.url and "Authorization" in self.req.headers:
-                HttpProxy.userinfo_token = self.req.headers["Authorization"]
+            if "https://player-preferences" in req.url and "Authorization" in req.headers:
+                HttpProxy.userinfo_token = req.headers["Authorization"]
 
-            response = self.edit_response(response)
+            response = await self.edit_response(response)
 
             if "Content-Length" in response.headers:
                 response.headers["Content-Length"] = str(len(response.content))

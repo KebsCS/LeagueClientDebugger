@@ -1,4 +1,5 @@
 import os, asyncio, re, requests, datetime, platform
+from ProxyServers import REQUEST_TIMEOUT
 from UiObjects import *
 
 
@@ -61,9 +62,13 @@ class ValoLogWatcher:
                             query_name, method, url, response_code = self.extract_details(new_log_entry)
                             #print(f"Query Name: {query_name}, Method: {method}, URL: {url}, Response Code: {response_code}")
                             response = None
-                            # todo, lags app on 404 i think
                             if method == "GET" and UiObjects.valoCallGets.isChecked():
-                                response = requests.request(method, url, headers=headers)
+                                # off the event loop, a blocking call here froze the whole ui
+                                try:
+                                    response = await asyncio.to_thread(requests.request, method, url,
+                                                                       headers=headers, timeout=REQUEST_TIMEOUT)
+                                except Exception as e:
+                                    print(f"[Valo] {method} {url} failed: {e!r}")
                             await ValoLogWatcher.log_message(query_name, method, url, response_code, headers, response)
 
                 await asyncio.sleep(0.1)
