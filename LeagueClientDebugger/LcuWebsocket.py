@@ -9,19 +9,39 @@ class LcuWebsocket:
     async def get_port_token(self):
         return await asyncio.to_thread(self._get_port_token_sync)
 
-    def _get_port_token_sync(self):
+    def _find_cmdline_sync(self):
         for proc in psutil.process_iter(['name', 'cmdline']):
             try:
                 if "LeagueClientUx" in proc.info['name'] and any('--app-port' in arg for arg in proc.info['cmdline']):
                     if proc.status() == psutil.STATUS_ZOMBIE:
                         continue
-                    cmdline = proc.info['cmdline']
-                    app_port = [s.split('=')[1] for s in cmdline if s.startswith('--app-port=')][0]
-                    auth_token = [s.split('=')[1] for s in cmdline if s.startswith('--remoting-auth-token=')][0]
-                    return app_port, auth_token
+                    if "LeagueClientUxRender" in proc.info['name']:
+                        continue
+                    return proc.info['cmdline']
             except Exception as e:
                 continue
-        return None, None
+        return None
+
+    @staticmethod
+    def _parse_port_token(cmdline):
+        port = next((arg.split('=', 1)[1] for arg in cmdline if arg.startswith('--app-port=')), None)
+        token = next((arg.split('=', 1)[1] for arg in cmdline if arg.startswith('--remoting-auth-token=')), None)
+        return port, token
+
+    def _get_client_info_sync(self):
+        cmdline = self._find_cmdline_sync()
+        if not cmdline:
+            return None, None, None
+        port, token = self._parse_port_token(cmdline)
+        return port, token, cmdline
+
+    async def get_client_info(self):
+        """Returns (port, token, cmdline) from a single process scan."""
+        return await asyncio.to_thread(self._get_client_info_sync)
+
+    def _get_port_token_sync(self):
+        port, token, _ = self._get_client_info_sync()
+        return port, token
 
     async def run(self):
         if self.is_running:

@@ -1,7 +1,7 @@
 from DetachableTabWidget import DetachableTabWidget
 from PyQt5 import QtWidgets
 QtWidgets.QTabWidget = DetachableTabWidget
-import sys, json, time, os, io, asyncio, pymem, requests, gzip, re, base64, datetime, psutil, ctypes, platform, zlib
+import sys, json, time, os, io, asyncio, pymem, requests, gzip, re, base64, datetime, psutil, ctypes, platform, zlib, subprocess
 from lxml import etree
 from PyQt5.uic import loadUiType # PyCharm bug, import works fine
 from PyQt5.QtCore import pyqtSlot, pyqtSignal, Qt, QEvent, QByteArray, QSize
@@ -252,6 +252,11 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         self.rcEnabled.stateChanged.connect(
             lambda state: self.start_rc_ws() if state == Qt.Checked else loop.create_task(self.rc_ws.close()))
 
+        for widget in (self.miscLcuPort, self.miscLcuToken, self.miscLcuAuth, self.miscLcuCmdline,
+                       self.miscRcPort, self.miscRcToken, self.miscRcAuth, self.miscRcCmdline):
+            widget.setFont(mono)
+        asyncio.get_event_loop().create_task(self.refresh_client_info())
+
         UiObjects.mitmTableWidget = self.mitmTableWidget
 
         ProxyServers.assign_ports()
@@ -436,7 +441,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             self.customHttpUrl.show()
             self.customHttpMethod.show()
             self.customHttpHeaders.show()
-        elif text == "LCU":
+        elif text == "LCU" or text == "RC":
             self.customHttpUrl.show()
             self.customHttpMethod.show()
             self.customHttpHeaders.hide()
@@ -455,11 +460,11 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                 protocol = self.customTable.item(row, 1).text()
                 self.customComboProtocol.setCurrentText(protocol)
                 self.customComboDetination.setCurrentText(self.customTable.item(row, 2).text())
-                if protocol == "HTTP/S" or protocol == "LCU":
+                if protocol in ("HTTP/S", "LCU", "RC"):
                     item = self.customTable.item(row, 3)
                     self.customHttpMethod.setText(item.data(256))
                     self.customHttpUrl.setText(item.data(257))
-                    if protocol != "LCU":
+                    if protocol == "HTTP/S":
                         self.customHttpHeaders.setPlainText(item.data(258))
                     self.customText.setPlainText(item.data(259))
                 else:
@@ -486,12 +491,12 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         protocol = self.customComboProtocol.currentText()
         self.customTable.setItem(rowCount, 1, QTableWidgetItem(protocol))
         self.customTable.setItem(rowCount, 2, QTableWidgetItem(self.customComboDetination.currentText()))
-        if protocol == "HTTP/S" or protocol == "LCU":
+        if protocol in ("HTTP/S", "LCU", "RC"):
             item = QTableWidgetItem()
             item.setText(self.customHttpMethod.text() + " " + self.customHttpUrl.text())
             item.setData(256, self.customHttpMethod.text())
             item.setData(257, self.customHttpUrl.text())
-            if protocol != "LCU":
+            if protocol == "HTTP/S":
                 item.setData(258, self.customHttpHeaders.toPlainText())
             item.setData(259, self.customText.toPlainText())
             self.customTable.setItem(rowCount, 3, item)
@@ -548,6 +553,12 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             elif protocol == "LCU":
                 loop = asyncio.get_event_loop()
                 loop.create_task(self.lcu_ws.request(self.customHttpMethod.text().strip(),
+                                    self.customHttpUrl.text().strip(),
+                                    self.customText.toPlainText(),
+                                    ProxyServers.fiddler_proxies))
+            elif protocol == "RC":
+                loop = asyncio.get_event_loop()
+                loop.create_task(self.rc_ws.request(self.customHttpMethod.text().strip(),
                                     self.customHttpUrl.text().strip(),
                                     self.customText.toPlainText(),
                                     ProxyServers.fiddler_proxies))
@@ -1106,6 +1117,30 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         self.SaveConfig()
 
     @pyqtSlot()
+    def on_miscButtonRefreshClientInfo_clicked(self):
+        asyncio.get_event_loop().create_task(self.refresh_client_info())
+
+    async def refresh_client_info(self):
+        targets = (
+            (self.lcu_ws, self.miscLcuPort, self.miscLcuToken, self.miscLcuAuth, self.miscLcuCmdline),
+            (self.rc_ws, self.miscRcPort, self.miscRcToken, self.miscRcAuth, self.miscRcCmdline),
+        )
+        for ws, port_edit, token_edit, auth_edit, cmdline_edit in targets:
+            try:
+                port, token, cmdline = await ws.get_client_info()
+            except Exception as e:
+                print("Failed to get client info ", e)
+                port, token, cmdline = None, None, None
+            cmdline_edit.setPlainText(subprocess.list2cmdline(cmdline) if cmdline else "")
+            if port is None or token is None:
+                for edit in (port_edit, token_edit, auth_edit):
+                    edit.clear()
+                continue
+            port_edit.setText(port)
+            token_edit.setText(token)
+            auth_edit.setText("Basic " + base64.b64encode(f"riot:{token}".encode("utf-8")).decode())
+
+    @pyqtSlot()
     def on_miscButtonTimestamp_clicked(self):
         timestamp = self.miscTextTimestamp.toPlainText()
         try:
@@ -1225,11 +1260,11 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                         self.customTable.item(row, 2).setText(req["destination"])
                         self.customTable.item(row, 3).setText(req["text"])
                         protocol = req["protocol"]
-                        if protocol == "HTTP/S" or protocol == "LCU":
+                        if protocol in ("HTTP/S", "LCU", "RC"):
                             item = self.customTable.item(row, 3)
                             item.setData(256, req["method"])
                             item.setData(257, req["url"])
-                            if protocol != "LCU":
+                            if protocol == "HTTP/S":
                                 item.setData(258, req["headers"])
                             item.setData(259, req["body"])
 
@@ -1371,11 +1406,11 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                     "destination": self.customTable.item(row, 2).text(),
                     "text": self.customTable.item(row, 3).text()
                 }
-                if protocol == "HTTP/S" or protocol == "LCU":
+                if protocol in ("HTTP/S", "LCU", "RC"):
                     item = self.customTable.item(row, 3)
                     req["method"] = item.data(256)
                     req["url"] = item.data(257)
-                    if protocol != "LCU":
+                    if protocol == "HTTP/S":
                         req["headers"] = item.data(258)
                     req["body"] = item.data(259)
                 data["customTable"].append(req)
