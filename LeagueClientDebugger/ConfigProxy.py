@@ -27,28 +27,30 @@ class ConfigProxy:
             if response.status_code == 403:
                 raise Exception("Client config Cloudflare blocked, open a github issue or message on discord")
 
+            def start_http_proxy(host, port):
+                if not host or host in ProxyServers.started_proxies:
+                    return
+                http_proxy = HttpProxy()
+                loop = asyncio.get_event_loop()
+                loop.create_task(http_proxy.run_server("127.0.0.1", port, host))
+                ProxyServers.started_proxies[host] = port
+
             # todo, move this, repeated code in SystemYaml.py
             def match_host_and_start_proxy(text):
-                def start_http_proxy(host, port):
-                    if not host or host in ProxyServers.started_proxies:
-                        return
-                    http_proxy = HttpProxy()
-                    loop = asyncio.get_event_loop()
-                    loop.create_task(http_proxy.run_server("127.0.0.1", port, host))
-                    ProxyServers.started_proxies[host] = port
-
                 pattern = r"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}"
                 last_end = 0
                 new_text = ""
                 for match in re.finditer(pattern, text):
                     url = match.group(0)
                     if ("localhost" in url or "127.0.0.1" in url or url in ProxyServers.excluded_hosts
-                            or "riotcdn" in url or "%1" in url or "clientconfig.rpg.riotgames.com" in url or "youtube.com" in url# broken urls
+                            or "%1" in url or "clientconfig.rpg.riotgames.com" in url or "youtube.com" in url# broken urls
                             or "shared." in url): # valorant
                         continue
                     if UiObjects.optionsDisableAuth.isChecked():
                         if "https://auth.riotgames.com" == url or "https://authenticate.riotgames.com" == url:
                             continue
+                    if UiObjects.optionsSkipRiotCdn.isChecked() and "riotcdn.net" in url:
+                        continue
 
                     if url not in ProxyServers.started_proxies:
                         port = find_free_port()
@@ -68,7 +70,21 @@ class ConfigProxy:
 
             config = match_host_and_start_proxy(config)
 
+            if not UiObjects.optionsSkipRiotCdn.isChecked():
+                cdn_host = "lol.dyn.riotcdn.net"
+                cdn_url = f"https://{cdn_host}"
+                if cdn_url not in ProxyServers.started_proxies:
+                    start_http_proxy(cdn_url, find_free_port())
+                cdn_port = ProxyServers.started_proxies[cdn_url]
+                config = config.replace(f'"{cdn_host}"', f'"localhost:{cdn_port}"')
+
             config = re.sub(r"(wss://([a-z]{2,4})\.edge\.rms\.si\.riotgames\.com)",
+                            f"ws://127.0.0.1", config)
+
+            config = re.sub(r"(wss://([a-z]{2,4})\.edge\.rms\.si\.lolesports\.com)",
+                            f"ws://127.0.0.1", config)
+
+            config = re.sub(r"(wss://([a-z]{2,4})\.edge\.rms\.si\.riotesports\.com)",
                             f"ws://127.0.0.1", config)
 
             config = re.sub(r"(wss://([a-z0-9]{2,4})-rms-edge\.esports\.rpg\.riotgames\.com)",

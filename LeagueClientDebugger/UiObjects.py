@@ -34,6 +34,7 @@ class UiObjects:
     optionsDisableAuth = None
     optionsRunAsAdmin = None
     optionsClientHandlesCookies = None
+    optionsSkipRiotCdn = None
     optionsDisableRTMPEncoding = None
 
     @staticmethod
@@ -98,6 +99,17 @@ def to_raw_response(response: requests.Response) -> bytearray:
 
     bytearr.extend(response.content)
     return bytearr
+
+
+def raw_http_to_text(raw: bytes) -> str:
+    try:
+        return raw.decode()
+    except UnicodeDecodeError:
+        pass
+    head, sep, body = raw.partition(b"\r\n\r\n")
+    if not sep:
+        return raw.hex()
+    return head.decode(errors="replace") + "\r\n\r\n" + f"<binary body, {len(body)} bytes>\r\n"# + body.hex()
 
 
 def to_raw_request(request) -> bytearray:

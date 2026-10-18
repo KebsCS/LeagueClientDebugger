@@ -135,8 +135,10 @@ class SystemYaml:
             for match in re.finditer(pattern, text):
                 url = match.group(0)
                 if ("localhost" in url or "127.0.0.1" in url or url in ProxyServers.excluded_hosts
-                        or "riotcdn" in url or "vivox" in url or "pbr.leagueoflegends.com" in url or "clientconfig.rpg.riotgames.com" in url
+                        or "vivox" in url or "pbr.leagueoflegends.com" in url or "clientconfig.rpg.riotgames.com" in url
                         or "support.riotgames.com" in url or "vts.si" in url or "lienminh.vnggames.com" in url):
+                    continue
+                if UiObjects.optionsSkipRiotCdn.isChecked() and "riotcdn.net" in url:
                     continue
 
                 if url not in ProxyServers.started_proxies:

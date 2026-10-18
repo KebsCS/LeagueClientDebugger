@@ -1,5 +1,6 @@
 import psutil, base64, websockets, ssl, asyncio, datetime
 from HttpProxy import HttpProxy
+from ProxyServers import REQUEST_TIMEOUT
 from UiObjects import *
 
 class RiotWs:
@@ -114,7 +115,7 @@ class RiotWs:
 
             response = await asyncio.to_thread(requests.request, method, url,
                                                headers=headers, data=body,
-                                               proxies=proxies, verify=False)
+                                               proxies=proxies, verify=False, timeout=REQUEST_TIMEOUT)
 
             HttpProxy.log_message(response)
         except Exception as e:

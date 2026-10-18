@@ -97,6 +97,20 @@
       </widget>
      </item>
      <item>
+      <widget class="QCheckBox" name="optionsSkipRiotCdn">
+       <property name="toolTip">
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;riotcdn.net hosts (patcher bundles, manifests, theme assets) are left untouched in the client config, so the client talks to them directly. Takes effect on the next client launch.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+       </property>
+       <property name="text">
+        <string>Don't capture riotcdn.net traffic
+(Patcher downloads, theme assets)</string>
+       </property>
+       <property name="checked">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
       <spacer name="spacer">
        <property name="orientation">
         <enum>Qt::Vertical</enum>

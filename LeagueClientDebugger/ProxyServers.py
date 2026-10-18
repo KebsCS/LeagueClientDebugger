@@ -28,10 +28,7 @@ class ProxyServers:
 
     started_proxies = {}
     excluded_hosts = [
-        "https://riot-client.secure.dyn.riotcdn.net",
         "https://telemetry.sgp.pvp.net",
-        "https://ritoplus.secure.dyn.riotcdn.net", # AccessDenied
-        "https://lol.secure.dyn.riotcdn.net", # AccessDenied
         # "https://static.rgpub.io",
         # "https://riot-geo.vts.si.riotgames.com",
         "https://legal.kr.riotgames.com",

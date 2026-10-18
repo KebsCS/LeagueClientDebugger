@@ -1,5 +1,6 @@
 import websockets, asyncio, base64, ssl, datetime, psutil
 from HttpProxy import HttpProxy
+from ProxyServers import REQUEST_TIMEOUT
 from UiObjects import *
 
 class LcuWebsocket:
@@ -116,10 +117,9 @@ class LcuWebsocket:
                 insert_index = len("https://127.0.0.1")
                 url = url[:insert_index] + ":" + port + url[insert_index:]
 
-            response = requests.request(method,
-                                        url,
-                                        headers=headers, data=body,
-                                        proxies=proxies, verify=False)
+            response = await asyncio.to_thread(requests.request, method, url,
+                                               headers=headers, data=body,
+                                               proxies=proxies, verify=False, timeout=REQUEST_TIMEOUT)
 
             HttpProxy.log_message(response)
         except Exception as e:

@@ -278,12 +278,8 @@ class HttpProxy:
             f"[{current_time}] {str(response.status_code.real)} {response.request.method} {response.request.url}")
         raw_request = to_raw_request(response.request)
 
-        try:
-            item.setData(256, raw_request.decode())
-        except UnicodeDecodeError:
-            item.setData(256, raw_request.hex())
-
-        item.setData(257, raw_response.decode())
+        item.setData(256, raw_http_to_text(raw_request))
+        item.setData(257, raw_http_to_text(raw_response))
         item.setData(258, "http")
 
         scrollbar = UiObjects.httpsList.verticalScrollBar()

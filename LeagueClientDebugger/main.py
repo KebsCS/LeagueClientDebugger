@@ -133,6 +133,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         UiObjects.optionsDisableAuth = dialog_ui.optionsDisableAuth
         UiObjects.optionsRunAsAdmin = dialog_ui.optionsRunAsAdmin
         UiObjects.optionsClientHandlesCookies = dialog_ui.optionsClientHandlesCookies
+        UiObjects.optionsSkipRiotCdn = dialog_ui.optionsSkipRiotCdn
         UiObjects.optionsDisableRTMPEncoding = dialog_ui.optionsDisableRTMPEncoding
 
         self.icon_xmpp = QIcon(os.path.join(self.base_dir, "images/xmpp.png"))
@@ -603,11 +604,14 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                     json_payload = bytes(decoded_payload, 'utf-8').decode('unicode_escape')
                     decoded_text = json.dumps(json.loads(json_payload), indent=4)
                     text = text.replace(match, decoded_text)
-                except UnicodeDecodeError:
+                except Exception:
                     pass
             matches_gzip = re.findall(GZIP_PATTERN, text)
             for match in matches_gzip:
-                decoded_text = gzip.decompress(base64.b64decode(match.encode("utf-8"))).decode('utf-8')
+                try:
+                    decoded_text = gzip.decompress(base64.b64decode(match.encode("utf-8"))).decode('utf-8')
+                except Exception:
+                    continue
                 try:
                     decoded_text = json.dumps(json.loads(decoded_text), indent=4)
                 except Exception:
@@ -709,12 +713,15 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
 
                 matches_gzip = re.findall(GZIP_PATTERN, text)
                 for match in matches_gzip:
-                    decoded_text = gzip.decompress(base64.b64decode(match.encode("utf-8"))).decode('utf-8')
+                    try:
+                        decoded_text = gzip.decompress(base64.b64decode(match.encode("utf-8"))).decode('utf-8')
+                    except Exception:
+                        continue
                     try:
                         decoded_text = json.dumps(json.loads(decoded_text), indent=4)
-                        text += "\r\n" + decoded_text
                     except Exception:
                         pass
+                    text += "\r\n" + decoded_text
 
                 # player-preferences data is yaml compressed with zlib and b64 encoded
                 if text and "https://player-preferences" in text.split("\r")[0]:
@@ -783,7 +790,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             return
         for index in range(self.httpsList.count()):
             item = self.httpsList.item(index)
-            text = item.data(256) + " " + item.data(257)
+            text = (item.data(256) or "") + " " + (item.data(257) or "")
             if search_text in text.lower():
                 item.setBackground(Qt.yellow)
             else:
@@ -796,7 +803,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             return
         for index in range(self.valoList.count()):
             item = self.valoList.item(index)
-            text = item.data(256)
+            text = item.data(256) or ""
             if search_text in text.lower():
                 item.setBackground(Qt.yellow)
             else:
@@ -1295,6 +1302,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                 if "optionsDisableAuth" in data:
                     UiObjects.optionsDisableAuth.setChecked(data["optionsDisableAuth"])
 
+                if "optionsSkipRiotCdn" in data:
+                    UiObjects.optionsSkipRiotCdn.setChecked(data["optionsSkipRiotCdn"])
+
                 if "optionsRunAsAdmin" in data:
                     UiObjects.optionsRunAsAdmin.setChecked(data["optionsRunAsAdmin"])
 
@@ -1354,7 +1364,10 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
 
     def SaveConfig(self):
         with open(self.config_dir, 'r+', encoding='utf-8') as configFile:
-            data = json.load(configFile) if os.stat(self.config_dir).st_size != 0 else {}
+            try:
+                data = json.load(configFile) if os.stat(self.config_dir).st_size != 0 else {}
+            except json.decoder.JSONDecodeError as e:
+                print("Config file corrupted, ", e)
 
             data["geometry"] = self.saveGeometry().data().hex()
 
@@ -1421,6 +1434,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             data["optionsIncludeRC"] = UiObjects.optionsIncludeRC.isChecked()
             data["optionsIncludeJWTs"] = UiObjects.optionsIncludeJWTs.isChecked()
             data["optionsDisableAuth"] = UiObjects.optionsDisableAuth.isChecked()
+            data["optionsSkipRiotCdn"] = UiObjects.optionsSkipRiotCdn.isChecked()
             data["optionsRunAsAdmin"] = UiObjects.optionsRunAsAdmin.isChecked()
             data["optionsClientHandlesCookies"] = UiObjects.optionsClientHandlesCookies.isChecked()
             data["optionsDisableRTMPEncoding"] = UiObjects.optionsDisableRTMPEncoding.isChecked()
