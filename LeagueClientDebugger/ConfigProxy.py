@@ -27,40 +27,6 @@ class ConfigProxy:
             if response.status_code == 403:
                 raise Exception("Client config Cloudflare blocked, open a github issue or message on discord")
 
-            def start_http_proxy(host, port):
-                if not host or host in ProxyServers.started_proxies:
-                    return
-                http_proxy = HttpProxy()
-                loop = asyncio.get_event_loop()
-                loop.create_task(http_proxy.run_server("127.0.0.1", port, host))
-                ProxyServers.started_proxies[host] = port
-
-            # todo, move this, repeated code in SystemYaml.py
-            def match_host_and_start_proxy(text):
-                pattern = r"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}"
-                last_end = 0
-                new_text = ""
-                for match in re.finditer(pattern, text):
-                    url = match.group(0)
-                    if ("localhost" in url or "127.0.0.1" in url or url in ProxyServers.excluded_hosts
-                            or "%1" in url or "clientconfig.rpg.riotgames.com" in url or "youtube.com" in url# broken urls
-                            or "shared." in url): # valorant
-                        continue
-                    if UiObjects.optionsDisableAuth.isChecked():
-                        if "https://auth.riotgames.com" == url or "https://authenticate.riotgames.com" == url:
-                            continue
-                    if UiObjects.optionsSkipRiotCdn.isChecked() and "riotcdn.net" in url:
-                        continue
-
-                    if url not in ProxyServers.started_proxies:
-                        port = find_free_port()
-                        start_http_proxy(url, port)
-                    new_text += text[last_end:match.start()]
-                    new_text += f"http://localhost:{ProxyServers.started_proxies[url]}"
-                    last_end = match.end()
-                new_text += text[last_end:]
-                return new_text
-
             original_config = response.json()
             config = json.dumps(await self.edit_config(original_config))
 
@@ -68,19 +34,24 @@ class ConfigProxy:
                 config = re.sub(r"(\w+)\.ledge\.leagueoflegends\.com", r"\1-red.lol.sgp.pvp.net", config)
                 config = re.sub(r"prod\.(\w+)\.lol\.riotgames\.com", r"feapp.\1.lol.pvp.net", config)
 
-            config = match_host_and_start_proxy(config)
+            exclude = ["%1", "youtube.com",  # broken urls
+                       "shared."]  # valorant
+            if UiObjects.optionsDisableAuth.isChecked():
+                exclude += ["https://auth.riotgames.com", "https://authenticate.riotgames.com"]
+            config = HttpProxy.match_host_and_start_proxy(config, exclude)
 
             if not UiObjects.optionsSkipRiotCdn.isChecked():
                 cdn_host = "lol.dyn.riotcdn.net"
                 cdn_url = f"https://{cdn_host}"
                 if cdn_url not in ProxyServers.started_proxies:
-                    start_http_proxy(cdn_url, find_free_port())
+                    HttpProxy.start_http_proxy(cdn_url, find_free_port())
                 cdn_port = ProxyServers.started_proxies[cdn_url]
                 config = config.replace(f'"{cdn_host}"', f'"localhost:{cdn_port}"')
 
             config = re.sub(r"(wss://([a-z]{2,4})\.edge\.rms\.si\.riotgames\.com)",
                             f"ws://127.0.0.1", config)
 
+            # TODO, I see switching protocols request but this never connects I think
             config = re.sub(r"(wss://([a-z]{2,4})\.edge\.rms\.si\.lolesports\.com)",
                             f"ws://127.0.0.1", config)
 

@@ -111,6 +111,14 @@
       </widget>
      </item>
      <item>
+      <widget class="QCheckBox" name="optionsSniProxy">
+       <property name="text">
+        <string>Capture telemetry requests (data.riotgames.com, telemetry.sgp.pvp.net)
+(Edits hosts file, installs a local root CA, listens on localhost:443)</string>
+       </property>
+      </widget>
+     </item>
+     <item>
       <spacer name="spacer">
        <property name="orientation">
         <enum>Qt::Vertical</enum>

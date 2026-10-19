@@ -19,6 +19,7 @@ from UiObjects import UiObjects
 from RmsProxy import RmsProxy
 from LcuWebsocket import LcuWebsocket
 from RiotWs import RiotWs
+import HttpsSniProxy
 import Hosts
 
 # import logging
@@ -134,6 +135,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         UiObjects.optionsRunAsAdmin = dialog_ui.optionsRunAsAdmin
         UiObjects.optionsClientHandlesCookies = dialog_ui.optionsClientHandlesCookies
         UiObjects.optionsSkipRiotCdn = dialog_ui.optionsSkipRiotCdn
+        UiObjects.optionsSniProxy = dialog_ui.optionsSniProxy
         UiObjects.optionsDisableRTMPEncoding = dialog_ui.optionsDisableRTMPEncoding
 
         self.icon_xmpp = QIcon(os.path.join(self.base_dir, "images/xmpp.png"))
@@ -265,6 +267,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         SystemYaml.edit()
 
         self.proxies_started = False
+        self.sni_proxy_started = False
 
     def show_hide_args(self):
         if self.allTextRCArgs.isHidden():
@@ -839,14 +842,6 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             else:
                 item.setBackground(Qt.transparent)
 
-    def start_http_proxy(self, host, port):
-        if not host or host in ProxyServers.started_proxies:
-            return
-        http_proxy = HttpProxy()
-        loop = asyncio.get_event_loop()
-        loop.create_task(http_proxy.run_server("127.0.0.1", port, host))
-        ProxyServers.started_proxies[host] = port
-
     def start_lcu_ws(self):
         if self.lcu_ws.global_ws:
             return
@@ -857,6 +852,43 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         if self.rc_ws.global_ws:
             return
         asyncio.create_task(self.rc_ws.run())
+
+    def start_sni_proxy(self):
+        if self.sni_proxy_started:
+            return
+        if platform.system() != "Windows":
+            print("[SniProxy] Only supported on Windows")
+            return
+
+        sni_hosts = HttpsSniProxy.SNI_HOSTS
+        if self.blocklist_enabled:
+            blocked = [line.strip() for line in self.miscBlocklist.toPlainText().splitlines()
+                       if line.strip() in sni_hosts]
+            if blocked:
+                print(f"[SniProxy] {', '.join(blocked)} are also in the active hosts blocklist, "
+                      f"remove them there or deactivate the blocklist to capture them")
+
+        # check if 127.0.0.1:443 isn't taken
+        port = HttpsSniProxy.LISTEN_PORT
+        holders = HttpsSniProxy.port_holders(port)
+        if holders or not HttpsSniProxy.can_bind(port):
+            names = ", ".join(f"{name} (pid {pid})" for name, pid in holders) or "another socket"
+            print(f"[SniProxy] Port {port} is not available - held by {names}. "
+                  f"Not writing hosts entries, telemetry would be sent into a dead port")
+            return
+
+        if not self.rewrite_etc_hosts({host: "127.0.0.1" for host in sni_hosts}, 3):
+            return
+
+        async def run():
+            try:
+                await HttpsSniProxy.HttpsSniProxy.run_server("127.0.0.1", HttpsSniProxy.LISTEN_PORT)
+            except OSError as e:
+                print(f"[SniProxy] Could not listen on 127.0.0.1:{HttpsSniProxy.LISTEN_PORT}: {e}")
+                self.remove_sni_hosts()
+
+        self.sni_proxy_started = True
+        asyncio.get_event_loop().create_task(run())
 
     @pyqtSlot()
     def on_allLaunchLeague_clicked(self):
@@ -871,6 +903,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             rms_proxy = RmsProxy(SystemYaml.rms[selected_region])
             loop = asyncio.get_event_loop()
             loop.create_task(rms_proxy.start_proxy(ProxyServers.rms_port))
+
+            if UiObjects.optionsSniProxy.isChecked():
+                self.start_sni_proxy()
 
             self.proxies_started = True
 
@@ -1305,6 +1340,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
                 if "optionsSkipRiotCdn" in data:
                     UiObjects.optionsSkipRiotCdn.setChecked(data["optionsSkipRiotCdn"])
 
+                if "optionsSniProxy" in data:
+                    UiObjects.optionsSniProxy.setChecked(data["optionsSniProxy"])
+
                 if "optionsRunAsAdmin" in data:
                     UiObjects.optionsRunAsAdmin.setChecked(data["optionsRunAsAdmin"])
 
@@ -1435,6 +1473,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
             data["optionsIncludeJWTs"] = UiObjects.optionsIncludeJWTs.isChecked()
             data["optionsDisableAuth"] = UiObjects.optionsDisableAuth.isChecked()
             data["optionsSkipRiotCdn"] = UiObjects.optionsSkipRiotCdn.isChecked()
+            data["optionsSniProxy"] = UiObjects.optionsSniProxy.isChecked()
             data["optionsRunAsAdmin"] = UiObjects.optionsRunAsAdmin.isChecked()
             data["optionsClientHandlesCookies"] = UiObjects.optionsClientHandlesCookies.isChecked()
             data["optionsDisableRTMPEncoding"] = UiObjects.optionsDisableRTMPEncoding.isChecked()
@@ -1465,7 +1504,13 @@ class MainWindow(QtWidgets.QMainWindow, Ui_LeagueClientDebuggerClass):
         self.SaveConfig()
         HttpProxy.executor.shutdown(wait=False, cancel_futures=True)
         HttpProxy.session.close()
+        self.remove_sni_hosts()
         event.accept()
+
+    def remove_sni_hosts(self):
+        self.sni_proxy_started = False
+        if not Hosts.rewrite_etc_hosts({}, 3):
+            print("[SniProxy] Could not remove the hosts entries, remove the '# LeagueClientDebugger-3' lines by hand")
 
 if __name__ == "__main__":
     # print silent QT errors

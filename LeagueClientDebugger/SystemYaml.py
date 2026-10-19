@@ -120,44 +120,18 @@ class SystemYaml:
         with open(path, 'r', encoding='utf-8') as file:
             content = file.read()
 
-        def match_host_and_start_proxy(text):
-            def start_http_proxy(host, port):
-                if not host or host in ProxyServers.started_proxies:
-                    return
-                http_proxy = HttpProxy()
-                loop = asyncio.get_event_loop()
-                loop.create_task(http_proxy.run_server("127.0.0.1", port, host))
-                ProxyServers.started_proxies[host] = port
-
-            pattern = r"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}"
-            last_end = 0
-            new_text = ""
-            for match in re.finditer(pattern, text):
-                url = match.group(0)
-                if ("localhost" in url or "127.0.0.1" in url or url in ProxyServers.excluded_hosts
-                        or "vivox" in url or "pbr.leagueoflegends.com" in url or "clientconfig.rpg.riotgames.com" in url
-                        or "support.riotgames.com" in url or "vts.si" in url or "lienminh.vnggames.com" in url):
-                    continue
-                if UiObjects.optionsSkipRiotCdn.isChecked() and "riotcdn.net" in url:
-                    continue
-
-                if url not in ProxyServers.started_proxies:
-                    port = find_free_port()
-                    start_http_proxy(url, port)
-
-                    if "https://auth." in url:
-                        ProxyServers.auth_port = port
-                new_text += text[last_end:match.start()]
-                new_text += f"http://localhost:{ProxyServers.started_proxies[url]}"
-                last_end = match.end()
-            new_text += text[last_end:]
-            return new_text
+        def remember_auth_port(url, port):
+            if "https://auth." in url:
+                ProxyServers.auth_port = port
 
         if UiObjects.miscDowngradeLCEnabled.isChecked():
             content = re.sub(r"(\w+)\.ledge\.leagueoflegends\.com", r"\1-red.lol.sgp.pvp.net", content)
             content = re.sub(r"prod\.(\w+)\.lol\.riotgames\.com", r"feapp.\1.lol.pvp.net", content)
 
-        new_content = match_host_and_start_proxy(content)
+        new_content = HttpProxy.match_host_and_start_proxy(
+            content,
+            exclude=["vivox", "pbr.leagueoflegends.com", "support.riotgames.com", "vts.si", "lienminh.vnggames.com"],
+            on_start=remember_auth_port)
 
         read_data = yaml.YAML(typ='rt').load(new_content)
         for region in read_data['region_data']:

@@ -7,3 +7,4 @@ LeagueClientDebugger/fullconfig*.txt
 LeagueClientDebugger/all_requests*.txt
 LeagueClientDebugger/saves/
 LeagueClientDebugger/*.pem
+LeagueClientDebugger/sni_certs/

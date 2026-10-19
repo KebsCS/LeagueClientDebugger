@@ -28,7 +28,6 @@ class ProxyServers:
 
     started_proxies = {}
     excluded_hosts = [
-        "https://telemetry.sgp.pvp.net",
         # "https://static.rgpub.io",
         # "https://riot-geo.vts.si.riotgames.com",
         "https://legal.kr.riotgames.com",
@@ -43,7 +42,12 @@ class ProxyServers:
         "https://recovery.riotgames.com",
         "https://support.riotgames.com",
         "https://update-account.riotgames.com",
-        "https://am-a.akamaihd.net" # images hosting
+        "https://am-a.akamaihd.net", # images hosting
+
+        # already in sni proxy
+        "https://data.riotgames.com",
+        "https://telemetry.sgp.pvp.net",
+        "https://ekg.riotgames.com",
     ]
 
     @staticmethod

@@ -35,6 +35,7 @@ class UiObjects:
     optionsRunAsAdmin = None
     optionsClientHandlesCookies = None
     optionsSkipRiotCdn = None
+    optionsSniProxy = None
     optionsDisableRTMPEncoding = None
 
     @staticmethod
@@ -110,6 +111,57 @@ def raw_http_to_text(raw: bytes) -> str:
     if not sep:
         return raw.hex()
     return head.decode(errors="replace") + "\r\n\r\n" + f"<binary body, {len(body)} bytes>\r\n"# + body.hex()
+
+
+try:
+    from google.protobuf.json_format import MessageToJson
+    from opentelemetry.proto.collector.logs.v1 import logs_service_pb2
+    from opentelemetry.proto.collector.metrics.v1 import metrics_service_pb2
+    from opentelemetry.proto.collector.trace.v1 import trace_service_pb2
+
+    OTLP_TYPES = {
+        "/v1/logs": (logs_service_pb2.ExportLogsServiceRequest, logs_service_pb2.ExportLogsServiceResponse),
+        "/v1/metrics": (metrics_service_pb2.ExportMetricsServiceRequest, metrics_service_pb2.ExportMetricsServiceResponse),
+        "/v1/traces": (trace_service_pb2.ExportTraceServiceRequest, trace_service_pb2.ExportTraceServiceResponse),
+    }
+except ImportError as e:
+    print(f"[Protobuf] typed otlp decoding unavailable ({e.name}), run pip install -r requirements.txt")
+    MessageToJson = None
+    OTLP_TYPES = {}
+
+try:
+    import blackboxprotobuf
+except ImportError:
+    print("[Protobuf] schema-less decoding unavailable (bbpb), run pip install -r requirements.txt")
+    blackboxprotobuf = None
+
+
+def is_protobuf_content_type(content_type) -> bool:
+    return bool(content_type) and "protobuf" in content_type.lower()
+
+
+def protobuf_to_text(body: bytes, path: str, is_request: bool):
+    if not body:
+        return None
+
+    path = path.rstrip("/")
+    types = next((t for suffix, t in OTLP_TYPES.items() if path.endswith(suffix)), None)
+    if types and MessageToJson:
+        try:
+            message = types[0 if is_request else 1]()
+            message.ParseFromString(body)
+            return MessageToJson(message, indent=2)
+        except Exception:
+            pass
+
+    if blackboxprotobuf:
+        try:
+            decoded, _ = blackboxprotobuf.decode_message(body)
+            return json.dumps(decoded, indent=2, default=str)
+        except Exception:
+            pass
+
+    return None
 
 
 def to_raw_request(request) -> bytearray:

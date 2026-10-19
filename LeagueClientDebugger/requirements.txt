@@ -9,5 +9,10 @@ websockets==13.1
 cryptography>=42.0.0
 PyQt5==5.15.11
 
+# protobuf decoding
+protobuf>=5.26
+opentelemetry-proto>=1.27.0
+bbpb>=1.0.0
+
 # Development
 PyQt5-stubs==5.15.6.0

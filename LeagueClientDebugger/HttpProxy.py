@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 from httptools import HttpRequestParser
 from requests.adapters import HTTPAdapter
 from typing import Any
-from ProxyServers import ProxyServers, REQUEST_TIMEOUT, MAX_CONCURRENT_REQUESTS
+from ProxyServers import ProxyServers, REQUEST_TIMEOUT, MAX_CONCURRENT_REQUESTS, find_free_port
 from ValoLogWatcher import ValoLogWatcher
 from UiObjects import *
 
@@ -99,6 +99,44 @@ class HttpProxy:
     # and every other proxy - a blocking call there stalls all of them at once
     executor = ThreadPoolExecutor(max_workers=MAX_CONCURRENT_REQUESTS, thread_name_prefix="http-proxy")
 
+    @staticmethod
+    def start_http_proxy(host: str, port: int):
+        if not host or host in ProxyServers.started_proxies:
+            return
+        http_proxy = HttpProxy()
+        loop = asyncio.get_event_loop()
+        loop.create_task(http_proxy.run_server("127.0.0.1", port, host))
+        ProxyServers.started_proxies[host] = port
+
+    @staticmethod
+    def match_host_and_start_proxy(text: str, exclude=(), on_start=None) -> str:
+        """starts a proxy for each new host and rewrites it
+        `exclude`: substrings, urls containing any of them are left as they are.
+        `on_start(url, port)`: called once for every proxy this call started."""
+        pattern = r"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}"
+        last_end = 0
+        new_text = ""
+        for match in re.finditer(pattern, text):
+            url = match.group(0)
+            if ("localhost" in url or "127.0.0.1" in url or url in ProxyServers.excluded_hosts
+                    or "clientconfig.rpg.riotgames.com" in url):
+                continue
+            if any(part in url for part in exclude):
+                continue
+            if UiObjects.optionsSkipRiotCdn.isChecked() and "riotcdn.net" in url:
+                continue
+
+            if url not in ProxyServers.started_proxies:
+                port = find_free_port()
+                HttpProxy.start_http_proxy(url, port)
+                if on_start:
+                    on_start(url, port)
+            new_text += text[last_end:match.start()]
+            new_text += f"http://localhost:{ProxyServers.started_proxies[url]}"
+            last_end = match.end()
+        new_text += text[last_end:]
+        return new_text
+
     class CustomProtocol(asyncio.Protocol):
         def __init__(self, original_host: str):
             self.parser = None
@@ -164,6 +202,15 @@ class HttpProxy:
                     lambda match: f"http://localhost:{ProxyServers.started_proxies[match.group(0)]}",
                     response.text
                 ).encode()
+
+            if "pmc.pay.riotgames.com" in response.url and response.content and "json" in response.headers.get("Content-Type").lower()\
+                    or "clientconfig.rpg.riotgames.com" in response.url: # for the uncaught clientconfig passed through sni
+                try:
+                    text = response.content.decode()
+                except UnicodeDecodeError:
+                    text = None
+                if text is not None:
+                    response._content = HttpProxy.match_host_and_start_proxy(text).encode()
 
             # CORS fix
             if response.request.method.upper() == "OPTIONS":
@@ -278,8 +325,33 @@ class HttpProxy:
             f"[{current_time}] {str(response.status_code.real)} {response.request.method} {response.request.url}")
         raw_request = to_raw_request(response.request)
 
-        item.setData(256, raw_http_to_text(raw_request))
-        item.setData(257, raw_http_to_text(raw_response))
+        request_text = raw_http_to_text(raw_request)
+        response_text = raw_http_to_text(raw_response)
+
+        # try decode protobuf
+        request_headers = response.request.headers or {}
+        if is_protobuf_content_type(request_headers.get("Content-Type")):
+            body = response.request.body or b""
+            if isinstance(body, str):
+                body = body.encode()
+            if body[:3] == b"\x1f\x8b\x08":
+                try:
+                    body = gzip.decompress(body)
+                except Exception:
+                    pass
+            path = requests.compat.urlparse(response.request.url).path
+            decoded = protobuf_to_text(body, path, is_request=True)
+            if decoded is not None:
+                request_text = request_text.split("\r\n\r\n", 1)[0] + "\r\n\r\n" + decoded
+
+        if is_protobuf_content_type(response.headers.get("Content-Type")):
+            path = requests.compat.urlparse(response.url).path
+            decoded = protobuf_to_text(response.content, path, is_request=False)
+            if decoded is not None:
+                response_text = response_text.split("\r\n\r\n", 1)[0] + "\r\n\r\n" + decoded
+
+        item.setData(256, request_text)
+        item.setData(257, response_text)
         item.setData(258, "http")
 
         scrollbar = UiObjects.httpsList.verticalScrollBar()
